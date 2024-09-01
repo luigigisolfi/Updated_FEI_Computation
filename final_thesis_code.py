@@ -1,15 +1,21 @@
-################################
-#FRAGMENTATION INDEX COMPUTATION 
-#Author: Luigi Gisolfi
-#Year: 2023
-################################
+# %matplotlib inline
 
-##############################################################################################################################################
-#Please, create the folder nube_XXX_km with the all the files cloud_XXX.fla 
-#Please create the empty folders: weights, figures, CSI_out (containing CSI0.out) INSIDE the folder named nube_XXX_km before running this code
-#Also make sure you have access to the file dens_mean_no_weights_2023.dat
-#Note: For the background, only MASTER population objects > 5 cm is considered 
-##########################################################################################################################################
+# # FRAGMENTATION INDEX COMPUTATION 
+#
+# **Author**: Luigi Gisolfi
+#
+# **Year**: 2023
+#
+# This code computes the (Upgraded) Fragmentation Environmental Index, as devised in [L. Gisolfi Master's Thesis](https://thesis.unipd.it/retrieve/b00fb71a-4118-444b-bb0e-3ab77846ce05/Gisolfi_Luigi.pdf.pdf). 
+#
+# Please, create the folder nube_XXX_km with the all the files cloud_XXX.fla 
+# Also, create the empty folders: weights, figures, CSI_out (containing CSI0.out) INSIDE the folder named nube_XXX_km before running this code.
+# Make sure you have access to the file dens_mean_no_weights_2023.dat
+# Note: For the background, only MASTER population objects > 5 cm is considered (file: background_pop.dat.5cm) has to be used as input
+#
+
+# ## Import Statements
+# Let's start by importing some relevant python modules that will be useful for the computation.
 
 import numpy as np
 from numpy import random
@@ -18,7 +24,17 @@ import os
 import math
 import time
 
-global r_e
+# # Auxiliary Functions - A library
+# In what follows, we define some functions that we will need for
+# * the computation of both radar and optical weights to be applied to the Criticality of Spacecraft Index (CSI)
+# * the computation of the CSI
+#
+# ## Radar Range equation
+# The observable given by a Resident Space Object is often given in terms of **range**, but the CSI definition rather relies on its **altitude**. The functions _h_to_rho_ and *rho_to_h* allow the user to go back and forth between the two quantities. 
+#
+# An object of the Earth's surface (with radius $r_{e} = 6378$ km) has an altitude of $0$ km.
+
+# +
 r_e = 6378 #in km
 
 def rho_to_h(rho): #rho = target range, r_e = Earth radius, elevation = telescope elevation angle
@@ -30,31 +46,51 @@ def h_to_rho(h):
     rho = r_e*(np.sqrt(((h+r_e)/r_e)**2 - np.cos(elevation)**2) - np.sin(elevation))
     return(rho)
 
+
+# -
+
+# ## Magnitude and Optical signature
+#
+# The magnitude of an RSO, together with its optical signature are computed as underlined in [Shell et al, 2010.](https://amostech.com/TechnicalPapers/2010/Systems/Shell.pdf)
+
+# +
 def m_obj(s,rho): 
     m_obj = -26.732 - 2.5*np.log10(((s/100)**2/(rho*1000)**2)*0.175*(0.25 + 2/(3*np.pi))) #s in cm, rho in km #diffuse and reflected specular component considered
     return (m_obj)
 
 def E_RSO(s,rho):
 
-    E_RSO = (5.6*10**10)*10**(-0.4*m_obj(s,rho))
+    E_RSO = (5.6*10**10)*10**(-0.4*m_obj(s,rho)) #in photons/s/m^2
     return(E_RSO)
 
-def threshold(h_coll,s_min,h_max):
-    rho_coll = h_to_rho(h_coll)
+
+# -
+
+# ## Threshold Values at a Given Altitude Fragmentation $h_{frag}$
+#
+# In our main work, the performance of an optical sensor is set by defining the **faintest magnitude** of an object that is able to trigger a detection. Since, for both optical and radar sensors, we are talking about **reflective objects**, we assume that **the bigger the size (diameter), the brighter the object**. Therefore, the _capability_ of a sensor can be set by defining the minimum size of an object that can be detected at a maximum altitude. This is computed by the two threshold and threshold_radar functions. 
+#
+# For each given size i (in $cm$, starting from $0.01$ $cm$), the ratio between the ratio of the magnitude of the object of size i at the collision altitude verus the least bright detectable object (which defines the capability) is computed. Due to the nature of magnitudes ( lower magnitude = brighter object), as soon as this ratio gets smaller than one, i defines the size of the smallest object that can be detected at $h_{frag}$. 
+#
+# A similar threshold, involving the ratio between cross sections, allows to determine the minimum detectable size for radar sensors in _threshold_radar_
+
+# +
+def threshold(h_frag,s_min,h_max):
+    rho_frag = h_to_rho(h_frag)
     rho_max = h_to_rho(h_max)
     
     i = 0
     ratio = 2
     while ratio >= 1:
         i = i+0.01
-        ratio = m_obj(i,rho_coll)/m_obj(s_min,rho_max)
+        ratio = m_obj(i,rho_frag)/m_obj(s_min,rho_max)
 
     return(round(i,1))
 
-def threshold_radar(h_coll,s_min,h_max):
+def threshold_radar(h_frag,s_min,h_max):
     i = 0.01
     ratio = 0.00001
-    rho_coll = h_to_rho(h_coll)
+    rho_frag = h_to_rho(h_frag)
     
     sigma_min = (np.pi/4)*s_min**2
     rho_max = h_to_rho(h_max)
@@ -63,14 +99,22 @@ def threshold_radar(h_coll,s_min,h_max):
         i = i+0.01
         sigma_fragment = (np.pi/4)*i**2
     
-        ratio = (sigma_fragment/rho_coll**4)/(sigma_min/rho_max**4)
+        ratio = (sigma_fragment/rho_frag**4)/(sigma_min/rho_max**4)
 
     return(round(i,2))  
 
-###########################
-#compute w_E_RSO(s,h) risk
-###########################
 
+# -
+
+# ## Optical Weight Computation
+# The optical weight is computed taking two factors into account:
+# 1) what SNR the RSO produces ($\omega_{t_{sig}}$)
+# 2) how fast the RSO is in the FOV (linked to the RSO altitude, $\omega_{E_{RSO}}$)
+#
+#
+# The function _get_omega_optical_sum_ allows to perform a weighted sum of the two optical weights 
+
+# +
 def w_E_RSO(s_fragment, a_fragment):
     h_fragment = a_fragment - r_e
     rho_fragment = h_to_rho(h_fragment)
@@ -85,10 +129,6 @@ def w_E_RSO(s_fragment, a_fragment):
         omega_E_RSO = 1
     
     return (omega_E_RSO)
-
-###########################
-#compute w_t_sig(h) risk
-##########################
 
 def w_t_sig(h_coll): #does not depend on fragment, only depends on h_coll of collision
     
@@ -105,9 +145,31 @@ def w_t_sig(h_coll): #does not depend on fragment, only depends on h_coll of col
         
     return(w_t_sig)
 
-###########################
-#compute w_radar(s,h) risk
-##########################
+def get_omega_optical_sum(omega_i_elem, omega_j_elem):
+    
+    if omega_i_elem == 1:
+        sum_optical_weights = omega_i_elem
+        return(sum_optical_weights)
+    
+    else: 
+        if (0<= h_coll <= 500):
+            A = 0.1
+            sum_optical_weights = (omega_i_elem*A + omega_j_elem)
+        elif (500< h_coll <= 1000):
+            A = 0.5
+            sum_optical_weights = (omega_i_elem*A + omega_j_elem)
+        else:
+            sum_optical_weights = omega_i_elem
+            
+    
+        return(sum_optical_weights)
+
+
+# -
+
+# ## Radar Weight
+#
+# The radar weight computation is more straightforward, as it ultimately only depends on the ratio between two radar cross sections.
 
 def w_radar(s_fragment,a_fragment):
     h_fragment = a_fragment - r_e
@@ -130,38 +192,14 @@ def w_radar(s_fragment,a_fragment):
 
     return(w_radar)
 
-###########################
-#put risks together
-##########################
+#
 
-def get_omega_optical_sum(omega_i_elem, omega_j_elem):
-    
-    if omega_i_elem == 1:
-        sum_optical_weights = omega_i_elem
-        return(sum_optical_weights)
-    
-    else: 
-        if (0<= h_coll <= 500):
-            A = 0.1
-            sum_optical_weights = (omega_i_elem*A + omega_j_elem)
-        elif (500< h_coll <= 1000):
-            A = 0.5
-            sum_optical_weights = (omega_i_elem*A + omega_j_elem)
-        else:
-            sum_optical_weights = omega_i_elem
-            
-    
-        return(sum_optical_weights)
-
-#############
-def get_omega_tot_radar_only(omega_i_radar_elem):
-
-    omega_tot_elem = omega_i_radar_elem
-    return(omega_tot_elem)
-
-##################################
-#compute fractional CSI for lists
-##################################
+# ## Computing the fractional CSI
+#
+# The (modified) fractional CSI, as defined in [Bombardelli et al](https://www.sciencedirect.com/science/article/abs/pii/S0273117717302491) and here incorporating the optical or radar weight, is computed as follows.
+#
+# The two functions are slightly different. The first one is optimized to compute the _fractional_CSI_ for multiple objects at the same time. The second one, _fractional_CSI_new_ is used for single objects, and we will use it later to compute the contribution to the CSI of the parent object.
+# +
 def fractional_CSI(mass,a,e,inc,weight, r_in, r_out):
     
     h_in = r_in - r_e
@@ -176,9 +214,6 @@ def fractional_CSI(mass,a,e,inc,weight, r_in, r_out):
 
     return(f_CSI)
 
-##########################################
-#compute fractional CSI for single objects
-##########################################
 def fractional_CSI_new(mass,a,e,inc,weight,r_in, r_out):
     
     h_in = r_in - r_e
@@ -194,10 +229,22 @@ def fractional_CSI_new(mass,a,e,inc,weight,r_in, r_out):
     
     return(f_CSI)
 
-########################
-#compute lifetime
-########################
 
+# -
+
+# ## CSI Elements Computation
+#
+# The CSI of an object depends on
+# * object lifetime
+# * object density of the crossed altitude shells
+# * time spent in each altitude shell
+# * object mass
+# * object orbital inclination
+#
+# The following auxiliary functions: _life_, _get_phi_ and _h_to_dens_ allow to compute all the necessary terms to compute the CSI.
+# Please note that, _get_phi_new_ is used later on for the parent object.
+
+# +
 def life(h_fragment):
     
     #coefficients from Bombardelli
@@ -216,10 +263,58 @@ def life(h_fragment):
         return(l)
     else:
         return(l)
+
+def get_phi(a,e, r_in, r_out):
     
-##################################
-#get_phi for single objects
-##################################
+    peri = a*(1-e)
+    apo = a*(1+e)
+    E_out = np.arccos((a - r_out)/(a*e)) #E_out of selected objects only
+    E_in = np.arccos((a - r_in)/(a*e))#E_in of selected objects only
+    
+    condizione1_peri = peri > r_in
+    condizione1_apo = apo < r_out
+    condizione2_peri = peri < r_in
+    condizione2_apo = apo > r_out
+    condizione3_peri = peri < r_in
+    condizione31_apo =  apo < r_out
+    condizione32_apo = apo > r_in
+    condizione41_peri = peri < r_out
+    condizione42_peri = peri > r_in
+    condizione4_apo = apo > r_out
+    condizione0_peri = peri > r_out
+    condizione0_apo = apo < r_in
+    
+    pos0 = np.where(condizione0_peri|condizione0_apo)
+    pos1 = np.where(condizione1_peri & condizione1_apo)
+    pos2 = np.where(condizione2_peri & condizione2_apo)
+    pos3 = np.where(condizione3_peri & (condizione31_apo & condizione32_apo))
+    pos4 = np.where((condizione41_peri & condizione42_peri) & condizione4_apo)
+    
+    phi_array = np.zeros(len(peri))
+    if len(pos0[0]) != 0:
+        phi_array[pos0] = 0
+    if len(pos1[0]) != 0:
+        phi_array[pos1] = 1
+    if len(pos2[0]) != 0:
+        phi_array[pos2] = (E_out[pos2] - E_in[pos2] - e[pos2]*(np.sin(E_out[pos2]) - np.sin(E_in[pos2])))/np.pi
+    if len(pos3[0]) != 0:
+        phi_array[pos3] = 1 - (E_in[pos3] - e[pos3]*(np.sin(E_in[pos3])))/np.pi
+    if len(pos4[0]) != 0:
+        phi_array[pos4] = (E_out[pos4] - e[pos4]*(np.sin(E_out[pos4])))/np.pi
+    else: 
+        phi_array = phi_array
+    return(phi_array)
+    
+def h_to_dens(h):
+
+    altitude, dens = np.loadtxt('/Users/luigigisolfi/dens_mean_2023.dat', unpack = True, usecols = (0,1))
+    altitude = np.round(altitude)
+    pos = np.where(altitude == h)[0]
+    pos_1 = pos +1
+    density = (dens[pos] + dens[pos_1])/2
+    #print(f'Density at {h} km: {density}')
+           
+    return(density)
 
 def get_phi_new(a,e, r_in, r_out):
     
@@ -263,68 +358,29 @@ def get_phi_new(a,e, r_in, r_out):
         phi = phi
         return(phi)
 
-##################################
-#get_phi for lists
-##################################
 
-def get_phi(a,e, r_in, r_out):
-    
-    peri = a*(1-e)
-    apo = a*(1+e)
-    E_out = np.arccos((a - r_out)/(a*e)) #E_out of selected objects only
-    E_in = np.arccos((a - r_in)/(a*e))#E_in of selected objects only
-    
-    condizione1_peri = peri > r_in
-    condizione1_apo = apo < r_out
-    condizione2_peri = peri < r_in
-    condizione2_apo = apo > r_out
-    condizione3_peri = peri < r_in
-    condizione31_apo =  apo < r_out
-    condizione32_apo = apo > r_in
-    condizione41_peri = peri < r_out
-    condizione42_peri = peri > r_in
-    condizione4_apo = apo > r_out
-    condizione0_peri = peri > r_out
-    condizione0_apo = apo < r_in
-    
-    pos0 = np.where(condizione0_peri|condizione0_apo)
-    pos1 = np.where(condizione1_peri & condizione1_apo)
-    pos2 = np.where(condizione2_peri & condizione2_apo)
-    pos3 = np.where(condizione3_peri & (condizione31_apo & condizione32_apo))
-    pos4 = np.where((condizione41_peri & condizione42_peri) & condizione4_apo)
-    
-    phi_array = np.zeros(len(peri))
-    if len(pos0[0]) != 0:
-        phi_array[pos0] = 0
-    if len(pos1[0]) != 0:
-        phi_array[pos1] = 1
-    if len(pos2[0]) != 0:
-        phi_array[pos2] = (E_out[pos2] - E_in[pos2] - e[pos2]*(np.sin(E_out[pos2]) - np.sin(E_in[pos2])))/np.pi
-    if len(pos3[0]) != 0:
-        phi_array[pos3] = 1 - (E_in[pos3] - e[pos3]*(np.sin(E_in[pos3])))/np.pi
-    if len(pos4[0]) != 0:
-        phi_array[pos4] = (E_out[pos4] - e[pos4]*(np.sin(E_out[pos4])))/np.pi
-    else: 
-        phi_array = phi_array
-    return(phi_array)
-    
-#############################
-#altitude - density data
-#############################
-def h_to_dens(h):
+# -
 
-    altitude, dens = np.loadtxt('/Users/luigigisolfi/dens_mean_2023.dat', unpack = True, usecols = (0,1))
-    altitude = np.round(altitude)
-    pos = np.where(altitude == h)[0]
-    pos_1 = pos +1
-    density = (dens[pos] + dens[pos_1])/2
-    #print(f'Density at {h} km: {density}')
-           
-    return(density)
+# ## Radar Main
+#
+# This function is called as a main when a pure radar network is assumed to be in place.
+# In it, all the above defined functions are used, so as to retrieve the needed information and compute the FEI. 
+#
+# It takes as inputs:
+# * the cloud file (from MASTER)
+# * the fragmentation altitude $h_{frag}$
+# * the minimum detectable size at $h_{max}$
+# * the maximum altitude at which the use of radar sensors is considered to be effective
+# * a piece of string, created with s_min and h_max, so it is in principle not needed...
+#
+# It gives as outputs:
+# * day_list (list of epoch after fragmentation, in Days)
+# * global_CSI_cloud_only_list (weights are considered)
+# * global_CSI_cloud_only_list_no_weights (weights are all set to one)
+# * global_CSI_list (cloud + background CSI, weights are considered)
+# * global_CSI_list_no_weights (cloud + background CSI, weights are all set to one)
+# * ratios_list (percentage FEI values)
 
-#########################################################
-#computes the FEI and CSI evolution of the fragmentation
-#########################################################
 def radar_main(nube, h_coll, s_min, h_max, piece_of_string):
     thresh = threshold_radar(h_coll,s_min,h_max) #minimum detectable size for a given rho_frag
 
@@ -456,15 +512,21 @@ def radar_main(nube, h_coll, s_min, h_max, piece_of_string):
             ratios_no_weights_list.append(ratios_no_weights)
                                             
         array_CSI_post_pre = np.transpose(np.array([CSI_post_list, CSI_pre_list]))
-    
-        if filename[6:9] == '100' or filename[6:9] == '001':
-            with open('/Users/luigigisolfi/' + str(nube)+ '/radar_CSI_post_pre_' + filename[6:9] +piece_of_string, 'w') as fw:
+        
+        # if filename[6:9] == '100' or filename[6:9] == '001':
+        #    with open('/Users/luigigisolfi/' + str(nube)+ '/radar_CSI_post_pre_' + filename[6:9] +piece_of_string, 'w') as fw:
+        #        for line in array_CSI_post_pre:
+        #            fw.writelines(str(line)[2:-2] + '\n')
+
+        if float(filename[6:9]) <= 100 and float(filename[6:9]) > 1:
+            print(filename)
+            with open(filename, 'w') as fw:
                 for line in array_CSI_post_pre:
                     fw.writelines(str(line)[2:-2] + '\n')
-        
+    
         global_CSI_cloud_only = np.sum(CSI_shell_list_array) #sum of the cumulative csi on all shells (only Frag - Parent)
         global_CSI_cloud_only_no_weights = np.sum(CSI_shell_list_no_weights_array) #same 
-    
+
         global_CSI = np.sum(np.array(CSI_post_list)) #sum of the cumulative csi on all shells 
         global_CSI_no_weights = np.sum(np.array(CSI_post_list_no_weights)) #same 
         
@@ -473,8 +535,10 @@ def radar_main(nube, h_coll, s_min, h_max, piece_of_string):
         global_CSI_cloud_only_list_no_weights.append(global_CSI_cloud_only_no_weights)
         global_CSI_list.append(global_CSI) #append it for each day
         global_CSI_list_no_weights.append(global_CSI_no_weights)
+        #day_list.append(float(filename[6:9])) #list of days
         day_list.append(float(filename[6:9])) #list of days
-    
+    print(day_list)
+
     array_cumulative_cloud_CSI = np.transpose(np.array([day_list,global_CSI_cloud_only_list]))
     array_cumulative_cloud_CSI_no_weights = np.transpose(np.array([day_list,global_CSI_cloud_only_list_no_weights]))
     array_global_CSI = np.transpose(np.array([day_list, global_CSI_list]))
@@ -511,7 +575,26 @@ def radar_main(nube, h_coll, s_min, h_max, piece_of_string):
             fw.writelines(str(line)[1:-1] + '\n')
     
     return(day_list, global_CSI_cloud_only_list, global_CSI_cloud_only_list_no_weights, global_CSI_list, global_CSI_list_no_weights, ratios_list)
-############################################################
+# ## Optical Main
+#
+# This function is called as a main when a pure optical network is assumed to be in place.
+# In it, all the above defined functions are used, so as to retrieve the needed information and compute the FEI. 
+#
+# It takes as inputs:
+# * the cloud file (from MASTER)
+# * the fragmentation altitude $h_{frag}$
+# * the minimum detectable size at $h_{max}$
+# * the maximum altitude at which the use of radar sensors is considered to be effective
+# * a piece of string, created with s_min and h_max, so it is in principle not needed...
+#
+# It gives as outputs:
+# * day_list (list of epoch after fragmentation, in Days)
+# * global_CSI_cloud_only_list (weights are considered)
+# * global_CSI_cloud_only_list_no_weights (weights are all set to one)
+# * global_CSI_list (cloud + background CSI, weights are considered)
+# * global_CSI_list_no_weights (cloud + background CSI, weights are all set to one)
+# * ratios_list (percentage FEI values)
+
 def optical_main(nube, h_coll, s_min,h_max, piece_of_string):
     
     thresh = threshold(h_coll,s_min,h_max) #minimum detectable size for a given rho_frag
@@ -704,7 +787,11 @@ def optical_main(nube, h_coll, s_min,h_max, piece_of_string):
 
     return(day_list, global_CSI_cloud_only_list, global_CSI_cloud_only_list_no_weights, global_CSI_list, global_CSI_list_no_weights, ratios_list)
 
-##############
+# ## Background Population FEI Computation
+# As done for the fragmentaiton cloud, we compute the FEI for each of the objects that were present in the atmosphere before the fragmentation event. These constitute the background population. 
+# As done above, this is computed for optical and/or radar.
+
+# +
 def radar_main_background(nube, h_coll, s_min,h_max, piece_of_string, background_pop):
         
     if not os.path.isfile(background_pop):
@@ -758,7 +845,6 @@ def radar_main_background(nube, h_coll, s_min,h_max, piece_of_string, background
                      
             fw_CSI0.writelines(str(total_CSI_shell) + ' ' + str(total_CSI_shell_no_weights) + '\n')
 
-#################
 def optical_main_background(nube, h_coll, s_min,h_max, piece_of_string, background_pop):
     
     omega_j_elem = w_t_sig(h_coll) #associated w_t_sig weight (depending on wether we are in LOW LEO, MED LEO or HIGH LEO)
@@ -819,9 +905,18 @@ def optical_main_background(nube, h_coll, s_min,h_max, piece_of_string, backgrou
 
             fw_CSI0.writelines(str(total_CSI_shell) + ' ' + str(total_CSI_shell_no_weights) + '\n')   
 
-######
-#PLOTS
-######
+
+# -
+
+# ## Visualizing the Results
+#
+# Some functions are written to properly visualize and make sense of the various results we obtained from the simulations:
+#
+# 1) plotter_CSI
+# 2) plotter_FEI
+# 3) multi_plotter_CSI
+# 4) modulated_FEI
+
 def plotter_CSI(network_type, c):
     
     plt.plot(day_list, global_CSI_cloud_only_list, 'o', ms = 3, color = c)
@@ -850,8 +945,6 @@ def plotter_CSI(network_type, c):
     plt.savefig('/Users/luigigisolfi/' + str(nube) + f'/figures/{network_type}{piece_of_string}' + '/Cumulative_CSI')
     plt.show()
 
-############################
-############################
 def plotter_FEI(network_type,c):
     size = piece_of_string.split('_')[1]
     shells, ratios_1 = np.loadtxt('/Users/luigigisolfi/' + str(nube)+ f'/array_shells_ratios_1_{network_type}' + piece_of_string, unpack= True, usecols = (0,1))
@@ -896,7 +989,6 @@ def plotter_FEI(network_type,c):
     plt.savefig('/Users/luigigisolfi/' + str(nube)+ f'/figures/{network_type}{piece_of_string}' + '/Modulated_FEI_T0_T100')
     plt.show()
 
-############################
 def multi_plotter_CSI(pieces_of_strings, nube, network_type):
 
     colors = ['black', 'grey', 'red']
@@ -1017,9 +1109,7 @@ def multi_plotter_CSI(pieces_of_strings, nube, network_type):
         plt.tight_layout()
         fig.savefig('/Users/luigigisolfi/' + str(nube)+ f'/figures/{network_type}' + '_Performance_Ratios',  bbox_inches="tight")
 
-############################
-#plot for modulated FEI
-############################
+# +
 def modulated_FEI(pieces_of_strings, nube, h_coll, network_type):
 
     for piece_of_string in pieces_of_strings:
@@ -1108,7 +1198,10 @@ def modulated_FEI(pieces_of_strings, nube, h_coll, network_type):
     # plt.yscale('log')
     # plt.savefig('/Users/luigigisolfi/' + str(nube)+ f'/figures/{network_type}' + '_Percentage_FEI_T0_T100_multi_plot_base')
     # plt.show()
-#############################
+
+
+# -
+# ## CUMULATIVE INDEX COMPUTATION AS A BONUS
 
 if __name__ == '__main__':
         
@@ -1180,4 +1273,3 @@ if __name__ == '__main__':
     else:
         print('Not a valid network type. Aborting...')
         exit()
-
