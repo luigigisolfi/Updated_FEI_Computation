@@ -1,21 +1,31 @@
-# %matplotlib inline
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[ ]:
+
+
+get_ipython().run_line_magic('matplotlib', 'inline')
+
 
 # # FRAGMENTATION INDEX COMPUTATION 
-#
+# 
 # **Author**: Luigi Gisolfi
-#
+# 
 # **Year**: 2023
-#
+# 
 # This code computes the (Upgraded) Fragmentation Environmental Index, as devised in [L. Gisolfi Master's Thesis](https://thesis.unipd.it/retrieve/b00fb71a-4118-444b-bb0e-3ab77846ce05/Gisolfi_Luigi.pdf.pdf). 
-#
+# 
 # Please, create the folder nube_XXX_km with the all the files cloud_XXX.fla 
 # Also, create the empty folders: weights, figures, CSI_out (containing CSI0.out) INSIDE the folder named nube_XXX_km before running this code.
 # Make sure you have access to the file dens_mean_no_weights_2023.dat
 # Note: For the background, only MASTER population objects > 5 cm is considered (file: background_pop.dat.5cm) has to be used as input
-#
+# 
 
 # ## Import Statements
 # Let's start by importing some relevant python modules that will be useful for the computation.
+
+# In[5]:
+
 
 import numpy as np
 from numpy import random
@@ -24,17 +34,20 @@ import os
 import math
 import time
 
+
 # # Auxiliary Functions - A library
 # In what follows, we define some functions that we will need for
 # * the computation of both radar and optical weights to be applied to the Criticality of Spacecraft Index (CSI)
 # * the computation of the CSI
-#
+# 
 # ## Radar Range equation
 # The observable given by a Resident Space Object is often given in terms of **range**, but the CSI definition rather relies on its **altitude**. The functions _h_to_rho_ and *rho_to_h* allow the user to go back and forth between the two quantities. 
-#
+# 
 # An object of the Earth's surface (with radius $r_{e} = 6378$ km) has an altitude of $0$ km.
 
-# +
+# In[ ]:
+
+
 r_e = 6378 #in km
 
 def rho_to_h(rho): #rho = target range, r_e = Earth radius, elevation = telescope elevation angle
@@ -47,13 +60,13 @@ def h_to_rho(h):
     return(rho)
 
 
-# -
-
 # ## Magnitude and Optical signature
-#
+# 
 # The magnitude of an RSO, together with its optical signature are computed as underlined in [Shell et al, 2010.](https://amostech.com/TechnicalPapers/2010/Systems/Shell.pdf)
 
-# +
+# In[ ]:
+
+
 def m_obj(s,rho): 
     m_obj = -26.732 - 2.5*np.log10(((s/100)**2/(rho*1000)**2)*0.175*(0.25 + 2/(3*np.pi))) #s in cm, rho in km #diffuse and reflected specular component considered
     return (m_obj)
@@ -64,17 +77,17 @@ def E_RSO(s,rho):
     return(E_RSO)
 
 
-# -
-
 # ## Threshold Values at a Given Altitude Fragmentation $h_{frag}$
-#
+# 
 # In our main work, the performance of an optical sensor is set by defining the **faintest magnitude** of an object that is able to trigger a detection. Since, for both optical and radar sensors, we are talking about **reflective objects**, we assume that **the bigger the size (diameter), the brighter the object**. Therefore, the _capability_ of a sensor can be set by defining the minimum size of an object that can be detected at a maximum altitude. This is computed by the two threshold and threshold_radar functions. 
-#
+# 
 # For each given size i (in $cm$, starting from $0.01$ $cm$), the ratio between the ratio of the magnitude of the object of size i at the collision altitude verus the least bright detectable object (which defines the capability) is computed. Due to the nature of magnitudes ( lower magnitude = brighter object), as soon as this ratio gets smaller than one, i defines the size of the smallest object that can be detected at $h_{frag}$. 
-#
+# 
 # A similar threshold, involving the ratio between cross sections, allows to determine the minimum detectable size for radar sensors in _threshold_radar_
 
-# +
+# In[ ]:
+
+
 def threshold(h_frag,s_min,h_max):
     rho_frag = h_to_rho(h_frag)
     rho_max = h_to_rho(h_max)
@@ -104,17 +117,17 @@ def threshold_radar(h_frag,s_min,h_max):
     return(round(i,2))  
 
 
-# -
-
 # ## Optical Weight Computation
 # The optical weight is computed taking two factors into account:
 # 1) what SNR the RSO produces ($\omega_{t_{sig}}$)
 # 2) how fast the RSO is in the FOV (linked to the RSO altitude, $\omega_{E_{RSO}}$)
-#
-#
+# 
+# 
 # The function _get_omega_optical_sum_ allows to perform a weighted sum of the two optical weights 
 
-# +
+# In[ ]:
+
+
 def w_E_RSO(s_fragment, a_fragment):
     h_fragment = a_fragment - r_e
     rho_fragment = h_to_rho(h_fragment)
@@ -165,11 +178,12 @@ def get_omega_optical_sum(omega_i_elem, omega_j_elem):
         return(sum_optical_weights)
 
 
-# -
-
 # ## Radar Weight
-#
+# 
 # The radar weight computation is more straightforward, as it ultimately only depends on the ratio between two radar cross sections.
+
+# In[ ]:
+
 
 def w_radar(s_fragment,a_fragment):
     h_fragment = a_fragment - r_e
@@ -192,14 +206,18 @@ def w_radar(s_fragment,a_fragment):
 
     return(w_radar)
 
-#
+
+# 
 
 # ## Computing the fractional CSI
-#
+# 
 # The (modified) fractional CSI, as defined in [Bombardelli et al](https://www.sciencedirect.com/science/article/abs/pii/S0273117717302491) and here incorporating the optical or radar weight, is computed as follows.
-#
+# 
 # The two functions are slightly different. The first one is optimized to compute the _fractional_CSI_ for multiple objects at the same time. The second one, _fractional_CSI_new_ is used for single objects, and we will use it later to compute the contribution to the CSI of the parent object.
-# +
+
+# In[ ]:
+
+
 def fractional_CSI(mass,a,e,inc,weight, r_in, r_out):
     
     h_in = r_in - r_e
@@ -230,21 +248,21 @@ def fractional_CSI_new(mass,a,e,inc,weight,r_in, r_out):
     return(f_CSI)
 
 
-# -
-
 # ## CSI Elements Computation
-#
+# 
 # The CSI of an object depends on
 # * object lifetime
 # * object density of the crossed altitude shells
 # * time spent in each altitude shell
 # * object mass
 # * object orbital inclination
-#
+# 
 # The following auxiliary functions: _life_, _get_phi_ and _h_to_dens_ allow to compute all the necessary terms to compute the CSI.
 # Please note that, _get_phi_new_ is used later on for the parent object.
 
-# +
+# In[ ]:
+
+
 def life(h_fragment):
     
     #coefficients from Bombardelli
@@ -359,20 +377,18 @@ def get_phi_new(a,e, r_in, r_out):
         return(phi)
 
 
-# -
-
 # ## Radar Main
-#
+# 
 # This function is called as a main when a pure radar network is assumed to be in place.
 # In it, all the above defined functions are used, so as to retrieve the needed information and compute the FEI. 
-#
+# 
 # It takes as inputs:
 # * the cloud file (from MASTER)
 # * the fragmentation altitude $h_{frag}$
 # * the minimum detectable size at $h_{max}$
 # * the maximum altitude at which the use of radar sensors is considered to be effective
 # * a piece of string, created with s_min and h_max, so it is in principle not needed...
-#
+# 
 # It gives as outputs:
 # * day_list (list of epoch after fragmentation, in Days)
 # * global_CSI_cloud_only_list (weights are considered)
@@ -381,10 +397,13 @@ def get_phi_new(a,e, r_in, r_out):
 # * global_CSI_list_no_weights (cloud + background CSI, weights are all set to one)
 # * ratios_list (percentage FEI values)
 
+# In[ ]:
+
+
 def radar_main(nube, h_coll, s_min, h_max, piece_of_string):
     thresh = threshold_radar(h_coll,s_min,h_max) #minimum detectable size for a given rho_frag
 
-    print('In this case, the minimum detectable size for a fragment is ABOUT ', thresh, 'cm')
+    print('In this case, the minimum detectable size for a fragment at h_frag is ABOUT ', thresh, 'cm')
 
     global_CSI_list = []
     global_CSI_list_no_weights = []
@@ -575,18 +594,20 @@ def radar_main(nube, h_coll, s_min, h_max, piece_of_string):
             fw.writelines(str(line)[1:-1] + '\n')
     
     return(day_list, global_CSI_cloud_only_list, global_CSI_cloud_only_list_no_weights, global_CSI_list, global_CSI_list_no_weights, ratios_list)
+
+
 # ## Optical Main
-#
+# 
 # This function is called as a main when a pure optical network is assumed to be in place.
 # In it, all the above defined functions are used, so as to retrieve the needed information and compute the FEI. 
-#
+# 
 # It takes as inputs:
 # * the cloud file (from MASTER)
 # * the fragmentation altitude $h_{frag}$
 # * the minimum detectable size at $h_{max}$
 # * the maximum altitude at which the use of radar sensors is considered to be effective
 # * a piece of string, created with s_min and h_max, so it is in principle not needed...
-#
+# 
 # It gives as outputs:
 # * day_list (list of epoch after fragmentation, in Days)
 # * global_CSI_cloud_only_list (weights are considered)
@@ -594,6 +615,9 @@ def radar_main(nube, h_coll, s_min, h_max, piece_of_string):
 # * global_CSI_list (cloud + background CSI, weights are considered)
 # * global_CSI_list_no_weights (cloud + background CSI, weights are all set to one)
 # * ratios_list (percentage FEI values)
+
+# In[ ]:
+
 
 def optical_main(nube, h_coll, s_min,h_max, piece_of_string):
     
@@ -787,11 +811,14 @@ def optical_main(nube, h_coll, s_min,h_max, piece_of_string):
 
     return(day_list, global_CSI_cloud_only_list, global_CSI_cloud_only_list_no_weights, global_CSI_list, global_CSI_list_no_weights, ratios_list)
 
+
 # ## Background Population FEI Computation
 # As done for the fragmentaiton cloud, we compute the FEI for each of the objects that were present in the atmosphere before the fragmentation event. These constitute the background population. 
 # As done above, this is computed for optical and/or radar.
 
-# +
+# In[ ]:
+
+
 def radar_main_background(nube, h_coll, s_min,h_max, piece_of_string, background_pop):
         
     if not os.path.isfile(background_pop):
@@ -906,16 +933,17 @@ def optical_main_background(nube, h_coll, s_min,h_max, piece_of_string, backgrou
             fw_CSI0.writelines(str(total_CSI_shell) + ' ' + str(total_CSI_shell_no_weights) + '\n')   
 
 
-# -
-
 # ## Visualizing the Results
-#
+# 
 # Some functions are written to properly visualize and make sense of the various results we obtained from the simulations:
-#
+# 
 # 1) plotter_CSI
 # 2) plotter_FEI
 # 3) multi_plotter_CSI
 # 4) modulated_FEI
+
+# In[ ]:
+
 
 def plotter_CSI(network_type, c):
     
@@ -944,6 +972,10 @@ def plotter_CSI(network_type, c):
     plt.tight_layout()
     plt.savefig('/Users/luigigisolfi/' + str(nube) + f'/figures/{network_type}{piece_of_string}' + '/Cumulative_CSI')
     plt.show()
+
+
+# In[ ]:
+
 
 def plotter_FEI(network_type,c):
     size = piece_of_string.split('_')[1]
@@ -988,6 +1020,10 @@ def plotter_FEI(network_type,c):
     plt.yscale('log')
     plt.savefig('/Users/luigigisolfi/' + str(nube)+ f'/figures/{network_type}{piece_of_string}' + '/Modulated_FEI_T0_T100')
     plt.show()
+
+
+# In[ ]:
+
 
 def multi_plotter_CSI(pieces_of_strings, nube, network_type):
 
@@ -1109,7 +1145,10 @@ def multi_plotter_CSI(pieces_of_strings, nube, network_type):
         plt.tight_layout()
         fig.savefig('/Users/luigigisolfi/' + str(nube)+ f'/figures/{network_type}' + '_Performance_Ratios',  bbox_inches="tight")
 
-# +
+
+# In[ ]:
+
+
 def modulated_FEI(pieces_of_strings, nube, h_coll, network_type):
 
     for piece_of_string in pieces_of_strings:
@@ -1200,8 +1239,10 @@ def modulated_FEI(pieces_of_strings, nube, h_coll, network_type):
     # plt.show()
 
 
-# -
 # ## CUMULATIVE INDEX COMPUTATION AS A BONUS
+
+# In[75]:
+
 
 if __name__ == '__main__':
         
@@ -1243,9 +1284,16 @@ if __name__ == '__main__':
         day_list, global_CSI_cloud_only_list, global_CSI_cloud_only_list_no_weights, global_CSI_list, global_CSI_list_no_weights, ratios_list = radar_main(nube, h_coll, s_min,h_max, piece_of_string)
 
         CUMULATIVE_INDEX = np.sum(global_CSI_cloud_only_list)
-        with open('cumulative_index_{}.txt', 'w') as cumulative_index:
-            cumulative_index.write(f'CUMULATIVE INDEX: {CUMULATIVE_INDEX}')
-            cumulative_index.close()
+        if os.path.isdir(f'/Users/luigigisolfi/{str(nube)}/CUMULATIVE_INDEX_RADAR/'):
+            print('CUMULATIVE_INDEX directory already exists.\n')
+            
+        else:
+            os.mkdir(f'/Users/luigigisolfi/{str(nube)}/CUMULATIVE_INDEX_RADAR/')
+            print('Created CUMULATIVE_INDEX directory.\n')
+        with open(f'/Users/luigigisolfi/{str(nube)}/CUMULATIVE_INDEX_RADAR/cumulative_index_{piece_of_string}.txt', 'w') as cumulative_index:
+                cumulative_index.write(f'CUMULATIVE INDEX: {CUMULATIVE_INDEX}')
+                cumulative_index.close()
+            
 
         plotter_FEI(network_type, c) 
         plotter_CSI(network_type, c)     
@@ -1264,12 +1312,103 @@ if __name__ == '__main__':
         day_list, global_CSI_cloud_only_list, global_CSI_cloud_only_list_no_weights, global_CSI_list, global_CSI_list_no_weights, ratios_list = optical_main(nube, h_coll, s_min,h_max, piece_of_string)
 
         CUMULATIVE_INDEX = np.sum(global_CSI_cloud_only_list)
-        with open('cumulative_index_{}.txt', 'w') as cumulative_index:
-            cumulative_index.write(f'CUMULATIVE INDEX: {CUMULATIVE_INDEX}')
-            cumulative_index.close()
+        if os.path.isdir(f'/Users/luigigisolfi/{str(nube)}/CUMULATIVE_INDEX_OPTICAL/'):
+            print('CUMULATIVE_INDEX directory already exists.\n')
+            
+        else:
+            os.mkdir(f'/Users/luigigisolfi/{str(nube)}/CUMULATIVE_INDEX_OPTICAL/')
+            print('Created CUMULATIVE_INDEX directory.\n')
+        with open(f'/Users/luigigisolfi/{str(nube)}/CUMULATIVE_INDEX_OPTICAL/cumulative_index_{piece_of_string}.txt', 'w') as cumulative_index:
+                cumulative_index.write(f'CUMULATIVE INDEX: {CUMULATIVE_INDEX}')
+                cumulative_index.close()
+            
 
         plotter_FEI(network_type, c)  
         plotter_CSI(network_type, c)
     else:
         print('Not a valid network type. Aborting...')
         exit()
+
+
+# In[ ]:
+
+
+pip install -U kaleido
+
+
+# In[103]:
+
+
+csi_cumulative_list = []
+capability_list = []
+nube = 'nube_450_km'
+for file in os.listdir(f'/Users/luigigisolfi/{str(nube)}/CUMULATIVE_INDEX_RADAR/'):
+    if file == '.ipynb_checkpoints' or '30' in file:
+        continue
+    print(file)
+    if len(file.split('_')[3]) == 4:
+        capability = float(file.split('_')[3][:2])
+        print(capability)
+    else:
+        capability = float(file.split('_')[3][:1])
+        print(capability)        
+    csi_cumulative = np.loadtxt(f'/Users/luigigisolfi/{str(nube)}/CUMULATIVE_INDEX_RADAR/{file}', unpack = True, usecols = 2)
+    csi_cumulative_list.append(csi_cumulative)
+    capability_list.append(capability)
+
+print(csi_cumulative_list)
+plt.axhline(1, color = 'r', linestyle = '--', alpha = 0.5)
+plt.axvline(15, color = 'r', linestyle = '--', alpha = 0.5)
+plt.scatter(np.sort(capability_list), np.sort(csi_cumulative_list)/np.sort(csi_cumulative_list)[2])
+plt.title('Cumulative Cloud CSI Over 100 Days (Normalized)')
+plt.xlabel('Minimum Detectable Size at 1200 km (cm)')
+plt.ylabel('Cumulative Cloud CSI')
+plt.savefig(f'/Users/luigigisolfi/{str(nube)}/figures/Cumulative_CSI_Radar_{str(nube)}')
+
+
+# In[105]:
+
+
+import plotly.express as px
+
+print(csi_cumulative_list/csi_cumulative_list[2])
+str_xlabel = [str(round(n)) + ' cm' for n in np.sort(capability_list)]
+fig = px.imshow([np.sort(csi_cumulative_list)/np.sort(csi_cumulative_list)[2]], color_continuous_scale=[(0, "blue"), (0.5, "white"), (1, "red")], color_continuous_midpoint=1)
+fig.update_xaxes(showticklabels=True).update_yaxes(showticklabels=False)
+fig.update_layout(
+    title={
+        'text': 'Cumulative Cloud CSI over 100 Days (Normalized)',            # Set your desired title text
+        'y': 0.9,                           # Vertical position (y-axis) of title (between 0 and 1)
+        'x': 0.5,                           # Horizontal position of the title
+        'xanchor': 'center',                # Anchor the title text horizontally
+        'yanchor': 'top'                    # Anchor the title text vertically
+    },
+    xaxis=dict(
+        tickvals=[0,1, 2, 3, 4,5],              # Positions of the ticks
+        ticktext=str_xlabel,  # Custom labels
+        tickangle=30,                          # Rotate labels by 45 degrees
+        tickfont=dict(size=14, color='black')   # Custom font size and color
+    )
+)
+
+fig.show()
+fig.write_image(f'/Users/luigigisolfi/{str(nube)}/figures/Cumulative_Color_Bar_{str(nube)}.png')
+
+
+# In[ ]:
+
+
+
+
+
+# In[15]:
+
+
+
+
+
+# In[ ]:
+
+
+
+
