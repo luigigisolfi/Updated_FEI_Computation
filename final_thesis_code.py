@@ -24,7 +24,7 @@ get_ipython().run_line_magic('matplotlib', 'inline')
 # ## Import Statements
 # Let's start by importing some relevant python modules that will be useful for the computation.
 
-# In[5]:
+# In[3]:
 
 
 import numpy as np
@@ -1241,7 +1241,7 @@ def modulated_FEI(pieces_of_strings, nube, h_coll, network_type):
 
 # ## CUMULATIVE INDEX COMPUTATION AS A BONUS
 
-# In[75]:
+# In[4]:
 
 
 if __name__ == '__main__':
@@ -1336,7 +1336,7 @@ if __name__ == '__main__':
 pip install -U kaleido
 
 
-# In[103]:
+# In[43]:
 
 
 csi_cumulative_list = []
@@ -1366,7 +1366,7 @@ plt.ylabel('Cumulative Cloud CSI')
 plt.savefig(f'/Users/luigigisolfi/{str(nube)}/figures/Cumulative_CSI_Radar_{str(nube)}')
 
 
-# In[105]:
+# In[44]:
 
 
 import plotly.express as px
@@ -1395,10 +1395,50 @@ fig.show()
 fig.write_image(f'/Users/luigigisolfi/{str(nube)}/figures/Cumulative_Color_Bar_{str(nube)}.png')
 
 
-# In[ ]:
+# In[100]:
 
 
+import matplotlib.pyplot as plt
+import numpy as np; np.random.seed(1)
+from scipy.interpolate import CubicSpline
+plt.rcParams["figure.figsize"] = 10,7
 
+
+# Example data (replace these with your actual data)
+
+# Sort and normalize
+y = np.sort(csi_cumulative_list) / np.sort(csi_cumulative_list)[2]
+x = np.sort(capability_list)
+
+degree = 2  # Degree of the polynomial
+coeffs = np.polyfit(x, y, degree)
+poly = np.poly1d(coeffs)
+
+# Interpolation
+x_new = np.linspace(x.min(), x.max(), 1000)  # New x-values for interpolation
+spline = CubicSpline(x, y)
+y_interpolated = spline(x_new)
+
+fig, (ax, ax2) = plt.subplots(nrows=2, sharex=True)
+
+extent = [x_new[0] - (x_new[1] - x_new[0]) / 2., x_new[-1] + (x_new[1] - x_new[0]) / 2., 0, 1]
+im = ax2.imshow(y_interpolated[np.newaxis, :], cmap="plasma", aspect="auto", extent=extent)
+ax2.set_yticks([])
+ax2.set_xlim(extent[0], extent[1])
+
+# Add colorbar
+cbar = plt.colorbar(im, ax=ax2, orientation='horizontal', pad=0.2)
+cbar.set_label('Cumulative Cloud CSI Value (Normalized)')
+
+ax.scatter(x, y, label='Original Data')
+ax.plot(x_new, y_interpolated, label='Interpolated Data', color='orange')
+ax.axhline(1, linestyle='--', color='red', alpha=0.5)
+ax.axvline(15, linestyle='--', color='red', alpha=0.5)
+ax2.set_xlabel('Minimum Detectable Size at 1200 km (cm)')
+ax.legend()
+
+plt.tight_layout()
+plt.show()
 
 
 # In[15]:
