@@ -6,7 +6,7 @@ parent_mass = object.SetParent.mass(mass = 2000)
 parent_e = object.SetParent.eccentricity(parent_e = 0.00003)
 parent_inc = object.SetParent.inclination(parent_inc = 80.3)
 
-h_frag = object.SetFragmentation.altitude(h_frag = 450)
+h_frag = object.SetFragmentation.fragmentation_altitude(h_frag = 450)
 
 s_min = object.SetObservingNetwork.s_min(s_min = 5)
 h_max = object.SetObservingNetwork.h_max(h_max = 1200)
