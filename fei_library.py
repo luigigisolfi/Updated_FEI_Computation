@@ -40,7 +40,7 @@ class ComputeFEI:
 
     # Assumes folder structure:
     # clouds/cloud_XXXkm/cloud_XXX.fla
-    def __init__(self, elevation = None, r_e = 6378, mean_density_file_path = f'/Users/luigigisolfi/dens_mean_2023.dat', clouds_folder_path = 'clouds'):
+    def __init__(self, h_frag = None, s_min = None, h_max =None ,elevation = None, r_e = 6378, mean_density_file_path = f'dens_mean_2023.dat', clouds_folder_path = 'clouds'):
         """
         Initialize the ComputeFEI class.
 
@@ -54,6 +54,9 @@ class ComputeFEI:
 
         self.r_e = r_e
         self.elevation = elevation
+        self.s_min = s_min
+        self.h_max = h_max
+        self.h_frag = h_frag
         self.mean_density_file_path = mean_density_file_path
         self.clouds_folder_path = clouds_folder_path
 
@@ -94,9 +97,9 @@ class ComputeFEI:
         def __init__(self, outer_instance):
             self.outer_instance = outer_instance
 
-        def altitude(self, h_frag):
+        def fragmentation_altitude(self, h_frag):
             self.h_frag = h_frag
-
+            self.outer_instance.h_frag = self.h_frag
             return(self.h_frag)
 
     class SetObservingNetwork:
@@ -105,15 +108,17 @@ class ComputeFEI:
 
         def constant_elevation(self, elevation):
             self.elevation = elevation
-            self.outer_instance.elevation = elevation
+            self.outer_instance.elevation = self.elevation
             return(self.elevation)
 
         def h_max(self, h_max):
             self.h_max = h_max
+            self.outer_instance.h_max = self.h_max
             return(self.h_max)
 
         def s_min(self, s_min):
             self.s_min = s_min
+            self.outer_instance.s_min = self.s_min
             return(self.s_min)
 
 
@@ -210,13 +215,13 @@ class ComputeFEI:
 
 
     def w_e_rso(self, s_fragment, a_fragment):
-        h_fragment = a_fragment - r_e
+        h_fragment = a_fragment - self.r_e
         rho_fragment = self.h_to_rho(h_fragment)
-        rho_max = self.h_to_rho(h_max)
-        if self.m_obj(s_fragment,rho_fragment) <= self.m_obj(s_min,rho_max): #check visibility
+        rho_max = self.h_to_rho(self.h_max)
+        if self.m_obj(s_fragment,rho_fragment) <= self.m_obj(self.s_min,rho_max): #check visibility
 
-            if s_fragment <= s_min:
-                self.omega_e_rso = 1 - (self.e_rso(s_fragment,rho_fragment)/self.e_rso(s_min,rho_fragment))
+            if s_fragment <= self.s_min:
+                self.omega_e_rso = 1 - (self.e_rso(s_fragment,rho_fragment)/self.e_rso(self.s_min,rho_fragment))
             else:
                 self.omega_e_rso = 0
         else:
@@ -224,15 +229,15 @@ class ComputeFEI:
 
         return (self.omega_e_rso)
 
-    def w_t_sig(self,h_coll): #does not depend on fragment, only depends on h_coll of collision
+    def w_t_sig(self,h_frag): #does not depend on fragment, only depends on h_frag of collision
 
         vel_HL = 500
         vel_ML = 1000
         vel_LL = 2000
 
-        if (0 <= h_coll <= 500):
+        if (0 <= h_frag <= 500):
             self.w_t_sig = 1 - vel_HL/vel_LL
-        elif(500 < h_coll <= 1000):
+        elif(500 < h_frag <= 1000):
             self.w_t_sig = 1 - vel_HL/vel_ML
         else:
             self.w_t_sig = 0
@@ -246,10 +251,10 @@ class ComputeFEI:
             return(self.sum_optical_weights)
 
         else:
-            if (0<= h_coll <= 500):
+            if (0<= self.h_frag <= 500):
                 A = 0.1
                 self.sum_optical_weights = (omega_i_elem*A + omega_j_elem)
-            elif (500< h_coll <= 1000):
+            elif (500< self.h_frag <= 1000):
                 A = 0.5
                 self.sum_optical_weights = (omega_i_elem*A + omega_j_elem)
             else:
@@ -271,21 +276,21 @@ class ComputeFEI:
         sigma_fragment = (np.pi/4)*s_fragment**2
         rho_fragment_radar = self.h_to_rho(h_fragment)
 
-        sigma_min_radar = (np.pi/4)*s_min**2
-        rho_max_radar = self.h_to_rho(h_max)
+        sigma_min_radar = (np.pi/4)*self.s_min**2
+        rho_max_radar = self.h_to_rho(self.h_max)
 
         if (sigma_fragment/rho_fragment_radar**4) >= (sigma_min_radar/rho_max_radar**4):
 
-            if s_fragment<= s_min:
-                self.w_radar = 1 - sigma_fragment/sigma_min_radar #the two rho_frag cancel out
+            if s_fragment<= self.s_min:
+                self.w_radar_value = 1 - sigma_fragment/sigma_min_radar #the two rho_frag cancel out
 
             else:
-                self.w_radar = 0
+                self.w_radar_value = 0
 
         else:
-            self.w_radar = 1
+            self.w_radar_value = 1
 
-        return(self.w_radar)
+        return(self.w_radar_value)
 
 
     #
@@ -301,8 +306,8 @@ class ComputeFEI:
 
     def fractional_csi(self, mass,a,e,inc,weight, r_in, r_out):
 
-        h_in = r_in - r_e
-        h_fragment = a - r_e
+        h_in = r_in - self.r_e
+        h_fragment = a - self.r_e
 
         phi = self.get_phi(a,e, r_in,r_out)
         mass_norm = mass/10000
@@ -315,8 +320,8 @@ class ComputeFEI:
 
     def parent_fractional_csi(self,mass,a,e,inc,weight,r_in, r_out):
 
-        h_in = r_in - r_e
-        h_fragment = a - r_e
+        h_in = r_in - self.r_e
+        h_fragment = a - self.r_e
 
         phi = self.get_phi_parent(a,e,r_in,r_out)
 
@@ -502,22 +507,38 @@ class ComputeFEI:
         parent_inc = self.SetParent.inclination(parent_inc) # parent_inc = 80.3
 
         cloud_folder_path = os.path.join(clouds_folder_path, cloud_name)
-        csi_background_folder = os.path.join(cloud_folder_path, 'csi_out')
+        csi_background_folder = os.path.join(cloud_folder_path, 'csi_background')
         background_filename = 'csi0_radar' + piece_of_string + '.out'
-        figures_folder_path = os.path.join(clouds_folder_path, 'figures')
-        weights_folder_path = os.path.join(clouds_folder_path, 'weights')
         data_folder_path = os.path.join(cloud_folder_path, 'data')
+        output_folder_path = os.path.join(cloud_folder_path, 'output')
+        weights_folder_path = os.path.join(output_folder_path, 'weights' + '/radar' + piece_of_string)
+        figures_folder_path = os.path.join(output_folder_path, 'figures' + '/radar' + piece_of_string)
+        csi_post_pre_folder_path = os.path.join(output_folder_path, 'csi_post_pre' + '/radar' + piece_of_string)
+        shells_ratios_path = os.path.join(output_folder_path, 'array_shells_ratios' + '/radar' + piece_of_string)
+        radar_global_csi_path = os.path.join(output_folder_path, 'global_csi'+ '/radar' + piece_of_string)
+        radar_cloud_only_csi_path = os.path.join(output_folder_path, 'cloud_only_csi' + '/radar' + piece_of_string)
+        radar_cloud_only_csi_path_no_weights = os.path.join(radar_cloud_only_csi_path, 'cloud_csi_no_weights' + '/radar' + piece_of_string)
+        radar_cloud_only_csi_path_weights = os.path.join(radar_cloud_only_csi_path, 'cloud_csi_weights' + '/radar' + piece_of_string)
 
+        folder_paths = [
+            cloud_folder_path, csi_background_folder, data_folder_path, output_folder_path,
+            weights_folder_path, figures_folder_path, csi_post_pre_folder_path,
+            shells_ratios_path, radar_global_csi_path, radar_cloud_only_csi_path,
+            radar_cloud_only_csi_path_no_weights, radar_cloud_only_csi_path_weights
+        ]
+
+        # Create folders if they do not exist
+        for folder in folder_paths:
+            if not os.path.exists(folder):
+                os.makedirs(folder)
+                print(f"Created folder: {folder}")
+            else:
+                print(f"Folder already exists: {folder}")
 
         csi_background, csi_background_no_weights = np.loadtxt(os.path.join(csi_background_folder, background_filename), unpack = True, usecols = (0,1))
         csi_background_array = np.array(csi_background)
         csi_background_no_weights_array = np.array(csi_background_no_weights)
 
-        if not os.path.isdir(figures_folder_path + '/radar' + piece_of_string):
-            os.makedirs(figures_folder_path + '/radar' + piece_of_string, exist_ok=True)
-
-        if not os.path.isdir(weights_folder_path + '/radar' + piece_of_string):
-            os.makedirs(weights_folder_path + '/radar' + piece_of_string, exist_ok=True)
 
         for filename in os.listdir(data_folder_path):
             print(f'Processing cloud file: {filename}')
@@ -564,7 +585,7 @@ class ComputeFEI:
 
             array = np.transpose(np.array([sizes, weights])) #array with sizes and associated weights
 
-            with open(weights_folder_path + '/radar' + piece_of_string + '/' + str(filename[:-4]) + '_weights.fla', 'w') as fw:
+            with open(os.path.join(weights_folder_path, str(filename[:-4]) + '_weights.fla'), 'w') as fw:
 
                 for line in array:
                     fw.writelines(str(line)[1:-1] + '\n')
@@ -619,7 +640,7 @@ class ComputeFEI:
             array_csi_post_pre = np.transpose(np.array([csi_post_list, csi_pre_list]))
 
             if float(filename[6:9]) <= 100 and float(filename[6:9]) > 1:
-                with open(filename, 'w') as fw:
+                with open(os.path.join(csi_post_pre_folder_path, filename[:-4] + '_csi_post_pre' + filename[-4:]), 'w') as fw:
                     for line in array_csi_post_pre:
                         fw.writelines(str(line)[2:-2] + '\n')
 
@@ -641,15 +662,15 @@ class ComputeFEI:
         array_cumulative_cloud_csi_no_weights = np.transpose(np.array([self.day_list,self.global_csi_cloud_only_list_no_weights]))
         array_global_csi = np.transpose(np.array([self.day_list, self.global_csi_list]))
 
-        with open(cloud_folder_path + '/radar_array_global_csi_cloud_only' + piece_of_string, 'w') as fw:
+        with open(os.path.join(radar_cloud_only_csi_path_weights, 'cloud_only_csi_weights'), 'w') as fw:
             for line in array_cumulative_cloud_csi:
                 fw.writelines(str(line)[1:-1] + '\n')
 
-        with open(cloud_folder_path + '/radar_array_global_csi_cloud_only_list_no_weights' + piece_of_string, 'w') as fw:
+        with open(os.path.join(radar_cloud_only_csi_path_no_weights, 'cloud_only_csi_no_weights'), 'w') as fw:
             for line in array_cumulative_cloud_csi_no_weights:
                 fw.writelines(str(line)[1:-1] + '\n')
 
-        with open(cloud_folder_path +  '/radar_array_global_csi' + piece_of_string, 'w') as fw:
+        with open(os.path.join(radar_global_csi_path, 'global_csi'), 'w') as fw:
             for line in array_global_csi:
                 fw.writelines(str(line)[1:-1] + '\n')
 
@@ -663,10 +684,10 @@ class ComputeFEI:
         array_shells_ratios_100 = np.transpose(np.array([shells,ratios_100]))
         array_shells_ratios_1 = np.transpose(np.array([shells,ratios_1]))
 
-        with open(cloud_folder_path +  '/array_shells_ratios_100_radar' + piece_of_string, 'w') as fw:
+        with open(shells_ratios_path+  '/array_shells_ratios_100_radar' + piece_of_string, 'w') as fw:
             for line in array_shells_ratios_100:
                 fw.writelines(str(line)[1:-1] + '\n')
-        with open(cloud_folder_path + '/array_shells_ratios_1_radar' + piece_of_string, 'w') as fw:
+        with open(shells_ratios_path + '/array_shells_ratios_1_radar' + piece_of_string, 'w') as fw:
             for line in array_shells_ratios_1:
                 fw.writelines(str(line)[1:-1] + '\n')
 
@@ -696,9 +717,9 @@ class ComputeFEI:
     # In[23]:
 
 
-    def optical_main(self, nube, h_coll, s_min,h_max, piece_of_string):
+    def optical_main(self, nube, h_frag, s_min,h_max, piece_of_string):
 
-        optical_threshold_value = self.optical_threshold(h_coll,s_min,h_max) #minimum detectable size for a given rho_frag
+        optical_threshold_value = self.optical_threshold(h_frag,s_min,h_max) #minimum detectable size for a given rho_frag
         global_csi_list = []
         global_csi_list_no_weights = []
         global_csi_cloud_only_list = []
@@ -709,7 +730,7 @@ class ComputeFEI:
         ratios_no_weights_list = []
 
         parent_mass = 2000
-        parent_a = h_coll + r_e
+        parent_a = h_frag + r_e
         parent_e = 0.00003
         parent_inc = 80.3
 
@@ -717,7 +738,7 @@ class ComputeFEI:
         csi_background_array = np.array(csi_background)
         csi_background_no_weights_array = np.array(csi_background_no_weights)
 
-        omega_j_elem = w_t_sig(h_coll) #associated w_t_sig weight (depending on wether we are in LOW LEO, MED LEO or HIGH LEO)
+        omega_j_elem = w_t_sig(h_frag) #associated w_t_sig weight (depending on wether we are in LOW LEO, MED LEO or HIGH LEO)
 
         if os.path.isdir('/Users/luigigisolfi/' + str(cloud_name) + '/figures/optical' + piece_of_string):
             print('path for figures already exists!')
@@ -897,7 +918,7 @@ class ComputeFEI:
 # In[25]:
 
 
-def radar_background(nube, h_coll, s_min,h_max, piece_of_string, background_pop):
+def radar_background(nube, h_frag, s_min,h_max, piece_of_string, background_pop):
 
     if not os.path.isfile(background_pop):
         print('Could not find background population file. Aborting...')
@@ -950,9 +971,9 @@ def radar_background(nube, h_coll, s_min,h_max, piece_of_string, background_pop)
 
             fw_csi0.writelines(str(total_csi_shell) + ' ' + str(total_csi_shell_no_weights) + '\n')
 
-def optical_main_background(nube, h_coll, s_min,h_max, piece_of_string, background_pop):
+def optical_main_background(nube, h_frag, s_min,h_max, piece_of_string, background_pop):
 
-    omega_j_elem = w_t_sig(h_coll) #associated w_t_sig weight (depending on wether we are in LOW LEO, MED LEO or HIGH LEO)
+    omega_j_elem = w_t_sig(h_frag) #associated w_t_sig weight (depending on wether we are in LOW LEO, MED LEO or HIGH LEO)
 
     if not os.path.isfile(background_pop):
         print('Could not find background population file. Aborting...')
@@ -1068,7 +1089,7 @@ def plotter_FEI(network_type,c):
 
     plt.plot(shells, ratios_1, label = 'Day 1', color = c)
     plt.plot(shells, ratios_100, label = 'Day 100',linestyle = '--', color = c)
-    plt.axvline(h_coll,0,linestyle = '-.',color = 'silver',label = 'Collision Altitude')
+    plt.axvline(h_frag,0,linestyle = '-.',color = 'silver',label = 'Collision Altitude')
     plt.xlabel('Altitude (km)')
     plt.ylabel('Percentage FEI')
     plt.legend(loc = 'lower right', prop={'size': 6})
@@ -1079,7 +1100,7 @@ def plotter_FEI(network_type,c):
 
     plt.plot(shells, diff_1, label = 'Day 1', color = c)
     plt.plot(shells, diff_100, label = 'Day 100', linestyle = '--', color = c)
-    plt.axvline(h_coll,0,linestyle = '-.',color = 'silver',label = 'Collision Altitude')
+    plt.axvline(h_frag,0,linestyle = '-.',color = 'silver',label = 'Collision Altitude')
     plt.xlabel('Altitude (km)')
     plt.ylabel('csi_post - csi_pre')
     plt.legend(loc = 'lower right', prop={'size': 6})
@@ -1090,7 +1111,7 @@ def plotter_FEI(network_type,c):
 
     plt.plot(shells, diff_1*ratios_1, label = 'Day 1', color = c)
     plt.plot(shells, diff_100*ratios_100, label = 'Day 100',linestyle = '--', color = c)
-    plt.axvline(h_coll,0,linestyle = '-.',color = 'silver',label = 'Collision Altitude')
+    plt.axvline(h_frag,0,linestyle = '-.',color = 'silver',label = 'Collision Altitude')
     plt.xlabel('Altitude (km)')
     plt.ylabel('Perc_FEI * Diff')
     plt.legend(loc = 'lower right', prop={'size': 6})
@@ -1107,9 +1128,9 @@ def multi_plotter_csi(pieces_of_strings, nube, network_type):
 
     colors = ['black', 'grey', 'red']
     if len(nube) == 11:
-        h_coll = round(float(nube[5:8]))
+        h_frag = round(float(nube[5:8]))
     elif len(nube) == 12:
-        h_coll = round(float(nube[5:9]))
+        h_frag = round(float(nube[5:9]))
 
     fig1, ax1 = plt.subplots()
     fig2, ax2 = plt.subplots()
@@ -1171,9 +1192,9 @@ def multi_plotter_csi(pieces_of_strings, nube, network_type):
         fig, axs = plt.subplots(3, 1)
 
         axs[0].plot(day_list_0, global_csi_list_1,'o', markersize = 3)
-        axs[0].set_title(f'Radar 15 cm, Coll. Altitude = {h_coll} km', fontsize = 'small')
+        axs[0].set_title(f'Radar 15 cm, Coll. Altitude = {h_frag} km', fontsize = 'small')
         axs[1].plot(day_list_0, global_csi_list_0, 'o', markersize = 3)
-        axs[1].set_title(f'Radar 5 cm, Coll. Altitude = {h_coll} km',  fontsize = 'small')
+        axs[1].set_title(f'Radar 5 cm, Coll. Altitude = {h_frag} km',  fontsize = 'small')
         axs[2].plot(day_list_0, percentage_ratio_performance, 'o', markersize = 3)
         axs[2].set_title('Performance Comparison', fontsize = 'small')
 
@@ -1204,9 +1225,9 @@ def multi_plotter_csi(pieces_of_strings, nube, network_type):
 
         fig, axs = plt.subplots(3, 1)
         axs[0].plot(day_list_0, global_csi_list_1,'o', markersize = 3)
-        axs[0].set_title(f'Optical 20 cm, Coll. Altitude = {h_coll} km', fontsize = 'small')
+        axs[0].set_title(f'Optical 20 cm, Coll. Altitude = {h_frag} km', fontsize = 'small')
         axs[1].plot(day_list_0, global_csi_list_0, 'o', markersize = 3)
-        axs[1].set_title(f'Optical 5 cm, Coll. Altitude = {h_coll} km',  fontsize = 'small')
+        axs[1].set_title(f'Optical 5 cm, Coll. Altitude = {h_frag} km',  fontsize = 'small')
         axs[2].plot(day_list_0, percentage_ratio_performance, 'o', markersize = 3)
         axs[2].set_title('Performance Comparison', fontsize = 'small')
 
@@ -1227,7 +1248,7 @@ def multi_plotter_csi(pieces_of_strings, nube, network_type):
 # In[30]:
 
 
-def modulated_FEI(pieces_of_strings, nube, h_coll, network_type):
+def modulated_FEI(pieces_of_strings, nube, h_frag, network_type):
 
     for piece_of_string in pieces_of_strings:
         size = piece_of_string.split('_')[1]
@@ -1238,7 +1259,7 @@ def modulated_FEI(pieces_of_strings, nube, h_coll, network_type):
 
         plt.plot(shells, ratios_1*(csi_post_1_base-csi_pre_1_base), label = 'Day 1', color = 'grey')
         plt.plot(shells, ratios_100*(csi_post_1_base-csi_pre_1_base), linestyle = '--', label = 'Day 100', color = 'grey')
-        plt.axvline(h_coll,0,linestyle = '-.',color = 'silver',label = 'Collision Altitude')
+        plt.axvline(h_frag,0,linestyle = '-.',color = 'silver',label = 'Collision Altitude')
         plt.title(f'Modulated Perc FEI ({network_type}, {size})')
         plt.xlabel('Altitude (km)')
         plt.ylabel('Modulated Perc FEI')
@@ -1247,7 +1268,7 @@ def modulated_FEI(pieces_of_strings, nube, h_coll, network_type):
         plt.savefig('/Users/luigigisolfi/' + str(cloud_name)+ f'/figures/{network_type}{piece_of_string}' + '/Modulated_FEI_T0_T100', bbox_inches = 'tight')
         plt.show()
 
-# def multi_plotter_FEI(pieces_of_strings, nube, h_coll, network_type):
+# def multi_plotter_FEI(pieces_of_strings, nube, h_frag, network_type):
 
 #     colors = ['black', 'grey', 'red']
 #     for piece_of_string, c in zip(pieces_of_strings, colors):
@@ -1257,7 +1278,7 @@ def modulated_FEI(pieces_of_strings, nube, h_coll, network_type):
 #         plt.plot(shells, ratios_1, label = f'{piece_of_string[1:5]} ' + f'{piece_of_string[6:]}' , color = c)
 #         plt.plot(shells, ratios_100, linestyle = '--', color = c)
 
-#     plt.axvline(h_coll,0,linestyle = '-.',color = 'silver',label = 'Collision Altitude')
+#     plt.axvline(h_frag,0,linestyle = '-.',color = 'silver',label = 'Collision Altitude')
 #     plt.xlabel('Altitude (km)')
 #     plt.ylabel('Percentage FEI')
 #     plt.legend(loc = 'lower right', prop={'size': 6})
@@ -1307,7 +1328,7 @@ def modulated_FEI(pieces_of_strings, nube, h_coll, network_type):
 #     plt.plot(shells, ratios_1_base, label = f'{piece_of_string[1:5]} ' + f'{piece_of_string[6:]}' , color = c)
 #     plt.plot(shells, ratios_100_base, linestyle = '--', color = c)
 
-# plt.axvline(h_coll,0,linestyle = '-.',color = 'silver',label = 'Collision Altitude')
+# plt.axvline(h_frag,0,linestyle = '-.',color = 'silver',label = 'Collision Altitude')
 # plt.xlabel('Altitude (km)')
 # plt.ylabel('Percentage FEI')
 # plt.legend(loc = 'lower right', prop={'size': 6})
