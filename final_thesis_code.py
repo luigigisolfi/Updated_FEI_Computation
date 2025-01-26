@@ -43,7 +43,7 @@ class ComputeFEI:
 
     # Assumes folder structure:
     # clouds/cloud_XXXkm/cloud_XXX.fla
-    def __init__(self, r_e, mean_density_file_path = f'/Users/luigigisolfi/dens_mean_2023.dat', clouds_folder_path = 'clouds' ):
+    def __init__(self, r_e, mean_density_file_path = f'dens_mean_2023.dat', clouds_folder_path = 'clouds' ):
         """
         Initialize the ComputeFEI class.
 

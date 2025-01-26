@@ -507,15 +507,16 @@ class ComputeFEI:
         figures_folder_path = os.path.join(clouds_folder_path, 'figures')
         weights_folder_path = os.path.join(clouds_folder_path, 'weights')
 
+
         csi_background, csi_background_no_weights = np.loadtxt(os.path.join(csi_background_folder, background_filename), unpack = True, usecols = (0,1))
         csi_background_array = np.array(csi_background)
         csi_background_no_weights_array = np.array(csi_background_no_weights)
 
         if not os.path.isdir(figures_folder_path + '/radar' + piece_of_string):
-            os.mkdir(figures_folder_path + '/radar' + piece_of_string)
+            os.makedirs(figures_folder_path + '/radar' + piece_of_string, exist_ok=True)
 
         if not os.path.isdir(weights_folder_path + '/radar' + piece_of_string):
-            os.mkdir(weights_folder_path + '/radar' + piece_of_string)
+            os.makedirs(weights_folder_path + '/radar' + piece_of_string, exist_ok=True)
 
         for filename in os.listdir(cloud_folder_path):
             print(f'Processing cloud file: {filename}')
