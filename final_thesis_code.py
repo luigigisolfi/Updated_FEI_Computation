@@ -1,13 +1,4 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[ ]:
-
-
-get_ipython().run_line_magic('matplotlib', 'inline')
-
-
-# # FRAGMENTATION INDEX COMPUTATION 
+# # FRAGMENTATION INDEX COMPUTATION
 # 
 # **Author**: Luigi Gisolfi
 # 
@@ -16,7 +7,7 @@ get_ipython().run_line_magic('matplotlib', 'inline')
 # This code computes the (Upgraded) Fragmentation Environmental Index, as devised in [L. Gisolfi Master's Thesis](https://thesis.unipd.it/retrieve/b00fb71a-4118-444b-bb0e-3ab77846ce05/Gisolfi_Luigi.pdf.pdf). 
 # 
 # Please, create the folder nube_XXX_km with the all the files cloud_XXX.fla 
-# Also, create the empty folders: weights, figures, CSI_out (containing CSI0.out) INSIDE the folder named nube_XXX_km before running this code.
+# Also, create the empty folders: weights, figures, csi_out (containing csi0.out) INSIDE the folder named nube_XXX_km before running this code.
 # Make sure you have access to the file dens_mean_no_weights_2023.dat
 # Note: For the background, only MASTER population objects > 5 cm is considered (file: background_pop.dat.5cm) has to be used as input
 # 
@@ -28,53 +19,142 @@ get_ipython().run_line_magic('matplotlib', 'inline')
 
 
 import numpy as np
-from numpy import random
 import matplotlib.pyplot as plt
 import os
 import math
-import time
 
 
 # # Auxiliary Functions - A library
 # In what follows, we define some functions that we will need for
-# * the computation of both radar and optical weights to be applied to the Criticality of Spacecraft Index (CSI)
-# * the computation of the CSI
+# * the computation of both radar and optical weights to be applied to the Criticality of Spacecraft Index (csi)
+# * the computation of the csi
 # 
 # ## Radar Range equation
-# The observable given by a Resident Space Object is often given in terms of **range**, but the CSI definition rather relies on its **altitude**. The functions _h_to_rho_ and *rho_to_h* allow the user to go back and forth between the two quantities. 
+# The observable given by a Resident Space Object is often given in terms of **range**, but the csi definition rather relies on its **altitude**. The functions _h_to_rho_ and *rho_to_h* allow the user to go back and forth between the two quantities. 
 # 
 # An object of the Earth's surface (with radius $r_{e} = 6378$ km) has an altitude of $0$ km.
 
-# In[ ]:
+# In[5]:
 
 
 r_e = 6378 #in km
 
-def rho_to_h(rho): #rho = target range, r_e = Earth radius, elevation = telescope elevation angle
-    r = np.sqrt(r_e**2 + rho**2 - 2*r_e*rho*np.cos(np.pi/2 + elevation))
-    h = r - r_e
-    return(h)
+class ComputeFEI:
 
-def h_to_rho(h):
-    rho = r_e*(np.sqrt(((h+r_e)/r_e)**2 - np.cos(elevation)**2) - np.sin(elevation))
-    return(rho)
+    # Assumes folder structure:
+    # clouds/cloud_XXXkm/cloud_XXX.fla
+    def __init__(self, r_e, mean_density_file_path = f'/Users/luigigisolfi/dens_mean_2023.dat', clouds_folder_path = 'clouds' ):
+        """
+        Initialize the ComputeFEI class.
+
+        Parameters:
+        r_e (float): Radius of the Earth.
+        elevation (float): Elevation angle of the telescope (in radians).
+        """
+        self.r_e = r_e
+        self.mean_density_file_path = mean_density_file_path
+        self.clouds_folder_path = clouds_folder_path
+
+    class SetParent:
+        def __init__(self, outer_instance):
+            """
+            Initialize the SetParent class.
+
+            Parameters:
+            outer_instance (ComputeFEI): Reference to the outer class instance.
+            """
+            self.outer_instance = outer_instance
+        def mass(self, mass):
+
+            self.parent_mass = mass
+
+            return(self.parent_mass)
+
+        def eccentricity(self, parent_e):
+
+            self.parent_e = parent_e
+
+            return(self.parent_e)
+
+        def semi_major_axis(self, h_frag):
+
+            self.parent_a = h_frag + self.outer_instance.r_e
+
+            return(self.parent_a)
+
+        def inclination(self, parent_inc):
+
+            self.parent_inc = parent_inc
+
+            return(self.parent_inc)
+
+    class SetFragmentation:
+        def __init__(self, outer_instance):
+            self.outer_instance = outer_instance
+            
+        def altitude(self, h_frag):
+            self.h_frag = h_frag
+
+            return(self.h_frag)
+        
+    class SetObservingNetwork:
+        def __init__(self, outer_instance):
+            self.outer_instance = outer_instance
+        
+        def constant_elevation(self, elevation):
+            self.elevation = elevation
+            
+            return(self.elevation)
+        
+        def h_max(self, h_max):
+            self.h_max = h_max
+            return(self.h_max)
+        
+        def s_min(self, s_min):
+            self.s_min = s_min
+            return(self.s_min)
+        
+        
+    def rho_to_h(self, rho):
+
+        """
+        Compute the height (h) of the target given its range (rho).
+
+        Parameters:
+        rho (float): Target range.
+
+        Returns:
+        float: Height of the target above Earth's surface.
+
+        """
+        r_e = self.r_e
+        elevation = self.elevation
+        r = np.sqrt(r_e**2 + rho**2 - 2 * r_e * rho * np.cos(np.pi / 2 + elevation))
+        self.h = r - r_e
+        return(self.h)
+
+    def h_to_rho(self, h):
+        r_e = self.r_e
+        elevation = self.elevation
+        self.rho = r_e*(np.sqrt(((h+r_e)/r_e)**2 - np.cos(elevation)**2) - np.sin(elevation))
+        return(self.rho)
 
 
 # ## Magnitude and Optical signature
 # 
 # The magnitude of an RSO, together with its optical signature are computed as underlined in [Shell et al, 2010.](https://amostech.com/TechnicalPapers/2010/Systems/Shell.pdf)
 
-# In[ ]:
+# In[7]:
 
 
-def m_obj(s,rho): 
-    m_obj = -26.732 - 2.5*np.log10(((s/100)**2/(rho*1000)**2)*0.175*(0.25 + 2/(3*np.pi))) #s in cm, rho in km #diffuse and reflected specular component considered
-    return (m_obj)
+    def m_obj(self,s,rho):
+        self.m_obj = -26.732 - 2.5*np.log10(((s/100)**2/(rho*1000)**2)*0.175*(0.25 + 2/(3*np.pi))) #s in cm, rho in km #diffuse and reflected specular component considered
+        return (self.m_obj)
 
-def E_RSO(s,rho):
+    def e_rso(self,s,rho):
 
-    E_RSO = (5.6*10**10)*10**(-0.4*m_obj(s,rho)) #in photons/s/m^2
-    return(E_RSO)
+        self.e_rso = (5.6*10**10)*10**(-0.4*self.m_obj(s,rho)) #in photons/s/m^2
+        return(self.e_rso)
 
 
 # ## Threshold Values at a Given Altitude Fragmentation $h_{frag}$
@@ -85,36 +165,35 @@ def E_RSO(s,rho):
 # 
 # A similar threshold, involving the ratio between cross sections, allows to determine the minimum detectable size for radar sensors in _threshold_radar_
 
-# In[ ]:
+# In[9]:
 
 
-def threshold(h_frag,s_min,h_max):
-    rho_frag = h_to_rho(h_frag)
-    rho_max = h_to_rho(h_max)
-    
-    i = 0
-    ratio = 2
-    while ratio >= 1:
-        i = i+0.01
-        ratio = m_obj(i,rho_frag)/m_obj(s_min,rho_max)
+    def optical_threshold(self, h_frag,s_min,h_max):
+        rho_frag = self.h_to_rho(h_frag)
+        rho_max = self.h_to_rho(h_max)
 
-    return(round(i,1))
+        self.optical_threshold_value = 0
+        ratio = 2
+        while ratio >= 1:
+            self.optical_threshold_value += 0.01
+            ratio = self.m_obj(self.optical_threshold_value,rho_frag)/self.m_obj(s_min,rho_max)
 
-def threshold_radar(h_frag,s_min,h_max):
-    i = 0.01
-    ratio = 0.00001
-    rho_frag = h_to_rho(h_frag)
-    
-    sigma_min = (np.pi/4)*s_min**2
-    rho_max = h_to_rho(h_max)
-    
-    while ratio <= 1:
-        i = i+0.01
-        sigma_fragment = (np.pi/4)*i**2
-    
-        ratio = (sigma_fragment/rho_frag**4)/(sigma_min/rho_max**4)
+        return(np.round(self.optical_threshold_value,1))
 
-    return(round(i,2))  
+    def radar_threshold(self, h_frag,s_min,h_max):
+        self.radar_threshold_value = 0.01
+        ratio = 0.00001
+        rho_frag = self.h_to_rho(h_frag)
+        
+        sigma_min = (np.pi/4)*s_min**2
+        rho_max = self.h_to_rho(h_max)
+        
+        while ratio <= 1:
+            self.radar_threshold_value += 0.01
+            sigma_fragment = (np.pi/4)*self.radar_threshold_value**2
+            ratio = (sigma_fragment/rho_frag**4)/(sigma_min/rho_max**4)
+
+        return(np.round(self.radar_threshold_value, 2))
 
 
 # ## Optical Weight Computation
@@ -125,256 +204,253 @@ def threshold_radar(h_frag,s_min,h_max):
 # 
 # The function _get_omega_optical_sum_ allows to perform a weighted sum of the two optical weights 
 
-# In[ ]:
+# In[11]:
 
 
-def w_E_RSO(s_fragment, a_fragment):
-    h_fragment = a_fragment - r_e
-    rho_fragment = h_to_rho(h_fragment)
-    rho_max = h_to_rho(h_max)
-    if m_obj(s_fragment,rho_fragment) <= m_obj(s_min,rho_max): #check visibility
-        
-        if (s_fragment <= s_min):
-            omega_E_RSO = 1 - (E_RSO(s_fragment,rho_fragment)/E_RSO(s_min,rho_fragment)) 
-        else: 
-            omega_E_RSO = 0
-    else:
-        omega_E_RSO = 1
-    
-    return (omega_E_RSO)
-
-def w_t_sig(h_coll): #does not depend on fragment, only depends on h_coll of collision
-    
-    vel_HL = 500
-    vel_ML = 1000
-    vel_LL = 2000
-
-    if (0 <= h_coll <= 500):
-        w_t_sig = 1 - vel_HL/vel_LL
-    elif(500 < h_coll <= 1000):
-        w_t_sig = 1 - vel_HL/vel_ML
-    else:
-        w_t_sig = 0
-        
-    return(w_t_sig)
-
-def get_omega_optical_sum(omega_i_elem, omega_j_elem):
-    
-    if omega_i_elem == 1:
-        sum_optical_weights = omega_i_elem
-        return(sum_optical_weights)
-    
-    else: 
-        if (0<= h_coll <= 500):
-            A = 0.1
-            sum_optical_weights = (omega_i_elem*A + omega_j_elem)
-        elif (500< h_coll <= 1000):
-            A = 0.5
-            sum_optical_weights = (omega_i_elem*A + omega_j_elem)
-        else:
-            sum_optical_weights = omega_i_elem
+    def w_e_rso(self, s_fragment, a_fragment):
+        h_fragment = a_fragment - r_e
+        rho_fragment = self.h_to_rho(h_fragment)
+        rho_max = self.h_to_rho(h_max)
+        if self.m_obj(s_fragment,rho_fragment) <= self.m_obj(s_min,rho_max): #check visibility
             
+            if s_fragment <= s_min:
+                self.omega_e_rso = 1 - (self.e_rso(s_fragment,rho_fragment)/self.e_rso(s_min,rho_fragment)) 
+            else: 
+                self.omega_e_rso = 0
+        else:
+            self.omega_e_rso = 1
+
+        return (self.omega_e_rso)
+
+    def w_t_sig(self,h_coll): #does not depend on fragment, only depends on h_coll of collision
+        
+        vel_HL = 500
+        vel_ML = 1000
+        vel_LL = 2000
     
-        return(sum_optical_weights)
+        if (0 <= h_coll <= 500):
+            self.w_t_sig = 1 - vel_HL/vel_LL
+        elif(500 < h_coll <= 1000):
+            self.w_t_sig = 1 - vel_HL/vel_ML
+        else:
+            self.w_t_sig = 0
+
+        return(self.w_t_sig)
+
+    def get_omega_optical_sum(self, omega_i_elem, omega_j_elem):
+        
+        if omega_i_elem == 1:
+            self.sum_optical_weights = omega_i_elem
+            return(self.sum_optical_weights)
+        
+        else: 
+            if (0<= h_coll <= 500):
+                A = 0.1
+                self.sum_optical_weights = (omega_i_elem*A + omega_j_elem)
+            elif (500< h_coll <= 1000):
+                A = 0.5
+                self.sum_optical_weights = (omega_i_elem*A + omega_j_elem)
+            else:
+                self.sum_optical_weights = omega_i_elem
+
+            return(self.sum_optical_weights)
 
 
 # ## Radar Weight
 # 
 # The radar weight computation is more straightforward, as it ultimately only depends on the ratio between two radar cross sections.
 
-# In[ ]:
+# In[18]:
 
 
-def w_radar(s_fragment,a_fragment):
-    h_fragment = a_fragment - r_e
-    sigma_fragment = (np.pi/4)*s_fragment**2
-    rho_fragment_radar = h_to_rho(h_fragment)
-    
-    sigma_min_radar = (np.pi/4)*s_min**2
-    rho_max_radar = h_to_rho(h_max)
-    
-    if (sigma_fragment/rho_fragment_radar**4) >= (sigma_min_radar/rho_max_radar**4):
+    def w_radar(self, s_fragment,a_fragment):
         
-        if s_fragment<= s_min:
-            w_radar = 1 - sigma_fragment/sigma_min_radar #the two rho_frag cancel out
+        h_fragment = a_fragment - r_e
+        sigma_fragment = (np.pi/4)*s_fragment**2
+        rho_fragment_radar = self.h_to_rho(h_fragment)
+        
+        sigma_min_radar = (np.pi/4)*s_min**2
+        rho_max_radar = self.h_to_rho(h_max)
+        
+        if (sigma_fragment/rho_fragment_radar**4) >= (sigma_min_radar/rho_max_radar**4):
+            
+            if s_fragment<= s_min:
+                self.w_radar = 1 - sigma_fragment/sigma_min_radar #the two rho_frag cancel out
+                
+            else:
+                self.w_radar = 0
             
         else:
-            w_radar = 0
+            self.w_radar = 1
+
+        return(self.w_radar)
+
+
+# 
+
+# ## Computing the fractional csi
+# 
+# The (modified) fractional csi, as defined in [Bombardelli et al](https://www.sciencedirect.com/science/article/abs/pii/S0273117717302491) and here incorporating the optical or radar weight, is computed as follows.
+# 
+# The two functions are slightly different. The first one is optimized to compute the _fractional_csi_ for multiple objects at the same time. The second one, _parent_fractional_csi_ is used for single objects, and we will use it later to compute the contribution to the csi of the parent object.
+
+# In[22]:
+
+
+    def fractional_csi(self, mass,a,e,inc,weight, r_in, r_out):
         
-    else:
-        w_radar = 1
-
-    return(w_radar)
-
-
-# 
-
-# ## Computing the fractional CSI
-# 
-# The (modified) fractional CSI, as defined in [Bombardelli et al](https://www.sciencedirect.com/science/article/abs/pii/S0273117717302491) and here incorporating the optical or radar weight, is computed as follows.
-# 
-# The two functions are slightly different. The first one is optimized to compute the _fractional_CSI_ for multiple objects at the same time. The second one, _fractional_CSI_new_ is used for single objects, and we will use it later to compute the contribution to the CSI of the parent object.
-
-# In[ ]:
-
-
-def fractional_CSI(mass,a,e,inc,weight, r_in, r_out):
+        h_in = r_in - r_e
+        h_fragment = a - r_e
     
-    h_in = r_in - r_e
-    h_fragment = a - r_e
+        phi = self.get_phi(a,e, r_in,r_out)
+        mass_norm = mass/10000
+        dens = self.h_to_dens(h_in)/(6.8*10**(-8))
+        f = (13-3*np.cos(inc*np.pi/180))/16
+        l = list(map(self.life, h_fragment))
+        self.f_csi = phi*mass_norm*dens*l*f*weight
 
-    phi = get_phi(a,e, r_in,r_out)
-    mass_norm = mass/10000
-    dens = h_to_dens(h_in)/(6.8*10**(-8))
-    f = (13-3*np.cos(inc*np.pi/180))/16
-    l = list(map(life, h_fragment))
-    f_CSI = phi*mass_norm*dens*l*f*weight
+        return(self.f_csi)
 
-    return(f_CSI)
-
-def fractional_CSI_new(mass,a,e,inc,weight,r_in, r_out):
+    def parent_fractional_csi(self,mass,a,e,inc,weight,r_in, r_out):
+        
+        h_in = r_in - r_e
+        h_fragment = a - r_e
     
-    h_in = r_in - r_e
-    h_fragment = a - r_e
+        phi = self.get_phi_parent(a,e,r_in,r_out)
+        
+        mass_norm = mass/10000
+        dens = self.h_to_dens(h_in)/(6.8*10**(-8))
+        parent_f = (13-3*np.cos(inc*np.pi/180))/16
+        parent_l = self.life(h_fragment)
+        self.f_csi = phi*mass_norm*dens*parent_l*parent_f*weight
 
-    phi = get_phi_new(a,e,r_in,r_out)
-    
-    mass_norm = mass/10000
-    dens = h_to_dens(h_in)/(6.8*10**(-8))
-    f = (13-3*np.cos(inc*np.pi/180))/16
-    l = life(h_fragment)
-    f_CSI = phi*mass_norm*dens*l*f*weight
-    
-    return(f_CSI)
+        return(self.f_csi)
 
 
-# ## CSI Elements Computation
+# ## csi Elements Computation
 # 
-# The CSI of an object depends on
+# The csi of an object depends on
 # * object lifetime
 # * object density of the crossed altitude shells
 # * time spent in each altitude shell
 # * object mass
 # * object orbital inclination
 # 
-# The following auxiliary functions: _life_, _get_phi_ and _h_to_dens_ allow to compute all the necessary terms to compute the CSI.
-# Please note that, _get_phi_new_ is used later on for the parent object.
+# The following auxiliary functions: _life_, _get_phi_ and _h_to_dens_ allow to compute all the necessary terms to compute the csi.
+# Please note that, _get_phi_parent_ is used later on for the parent object.
 
-# In[ ]:
+# In[25]:
 
 
-def life(h_fragment):
+    def life(self,h_fragment):
+        
+        #coefficients from Bombardelli
     
-    #coefficients from Bombardelli
+        h_ref = 1031.5 #in km
+        a_coeff= 6.5215
+        b_coeff=0.2583
+        c_coeff=-33.8481
+        
+        life_fragment = math.exp(a_coeff*(h_fragment**b_coeff) + c_coeff)
+        life_ref = math.exp(a_coeff*(h_ref**b_coeff) + c_coeff)
+        self.l = life_fragment/life_ref
+        
+        if self.l >= 1:
+            self.l = 1
+            return(self.l)
+        else:
+            return(self.l)
 
-    h_ref = 1031.5 #in km
-    a_coeff= 6.5215
-    b_coeff=0.2583
-    c_coeff=-33.8481
+    def get_phi(self, a,e, r_in, r_out):
+        
+        peri = a*(1-e)
+        apo = a*(1+e)
+        E_out = np.arccos((a - r_out)/(a*e)) #E_out of selected objects only
+        E_in = np.arccos((a - r_in)/(a*e))#E_in of selected objects only
+        
+        condition1_peri = peri > r_in
+        condition1_apo = apo < r_out
+        condition2_peri = peri < r_in
+        condition2_apo = apo > r_out
+        condition3_peri = peri < r_in
+        condition31_apo =  apo < r_out
+        condition32_apo = apo > r_in
+        condition41_peri = peri < r_out
+        condition42_peri = peri > r_in
+        condition4_apo = apo > r_out
+        condition0_peri = peri > r_out
+        condition0_apo = apo < r_in
+        
+        pos0 = np.where(condition0_peri|condition0_apo)
+        pos1 = np.where(condition1_peri & condition1_apo)
+        pos2 = np.where(condition2_peri & condition2_apo)
+        pos3 = np.where(condition3_peri & (condition31_apo & condition32_apo))
+        pos4 = np.where((condition41_peri & condition42_peri) & condition4_apo)
+        
+        self.phi_array = np.zeros(len(peri))
+        if len(pos0[0]) != 0:
+            self.phi_array[pos0] = 0
+        if len(pos1[0]) != 0:
+            self.phi_array[pos1] = 1
+        if len(pos2[0]) != 0:
+            self.phi_array[pos2] = (E_out[pos2] - E_in[pos2] - e[pos2]*(np.sin(E_out[pos2]) - np.sin(E_in[pos2])))/np.pi
+        if len(pos3[0]) != 0:
+            self.phi_array[pos3] = 1 - (E_in[pos3] - e[pos3]*(np.sin(E_in[pos3])))/np.pi
+        if len(pos4[0]) != 0:
+            self.phi_array[pos4] = (E_out[pos4] - e[pos4]*(np.sin(E_out[pos4])))/np.pi
+        else: 
+            self.phi_array = self.phi_array
+            
+        return(self.phi_array)
     
-    life_fragment = math.exp(a_coeff*(h_fragment**b_coeff) + c_coeff)
-    life_ref = math.exp(a_coeff*(h_ref**b_coeff) + c_coeff)
-    l = life_fragment/life_ref
+    def h_to_dens(self, h):
     
-    if l >= 1:
-        l = 1
-        return(l)
-    else:
-        return(l)
+        altitude, dens = np.loadtxt(self.mean_density_file_path, unpack = True, usecols = (0,1))
+        altitude = np.round(altitude)
+        pos = np.where(altitude == h)[0]
+        pos_1 = pos +1
+        self.density = (dens[pos] + dens[pos_1])/2
+        return(self.density)
 
-def get_phi(a,e, r_in, r_out):
-    
-    peri = a*(1-e)
-    apo = a*(1+e)
-    E_out = np.arccos((a - r_out)/(a*e)) #E_out of selected objects only
-    E_in = np.arccos((a - r_in)/(a*e))#E_in of selected objects only
-    
-    condizione1_peri = peri > r_in
-    condizione1_apo = apo < r_out
-    condizione2_peri = peri < r_in
-    condizione2_apo = apo > r_out
-    condizione3_peri = peri < r_in
-    condizione31_apo =  apo < r_out
-    condizione32_apo = apo > r_in
-    condizione41_peri = peri < r_out
-    condizione42_peri = peri > r_in
-    condizione4_apo = apo > r_out
-    condizione0_peri = peri > r_out
-    condizione0_apo = apo < r_in
-    
-    pos0 = np.where(condizione0_peri|condizione0_apo)
-    pos1 = np.where(condizione1_peri & condizione1_apo)
-    pos2 = np.where(condizione2_peri & condizione2_apo)
-    pos3 = np.where(condizione3_peri & (condizione31_apo & condizione32_apo))
-    pos4 = np.where((condizione41_peri & condizione42_peri) & condizione4_apo)
-    
-    phi_array = np.zeros(len(peri))
-    if len(pos0[0]) != 0:
-        phi_array[pos0] = 0
-    if len(pos1[0]) != 0:
-        phi_array[pos1] = 1
-    if len(pos2[0]) != 0:
-        phi_array[pos2] = (E_out[pos2] - E_in[pos2] - e[pos2]*(np.sin(E_out[pos2]) - np.sin(E_in[pos2])))/np.pi
-    if len(pos3[0]) != 0:
-        phi_array[pos3] = 1 - (E_in[pos3] - e[pos3]*(np.sin(E_in[pos3])))/np.pi
-    if len(pos4[0]) != 0:
-        phi_array[pos4] = (E_out[pos4] - e[pos4]*(np.sin(E_out[pos4])))/np.pi
-    else: 
-        phi_array = phi_array
-    return(phi_array)
-    
-def h_to_dens(h):
-
-    altitude, dens = np.loadtxt('/Users/luigigisolfi/dens_mean_2023.dat', unpack = True, usecols = (0,1))
-    altitude = np.round(altitude)
-    pos = np.where(altitude == h)[0]
-    pos_1 = pos +1
-    density = (dens[pos] + dens[pos_1])/2
-    #print(f'Density at {h} km: {density}')
-           
-    return(density)
-
-def get_phi_new(a,e, r_in, r_out):
-    
-    E_out_par = np.arccos((a - r_out)/(a*e))
-    E_in_par = np.arccos((a - r_in)/(a*e))
-    
-    peri_par = a*(1-e)
-    apo_par = a*(1+e)
-    
-    cond0_peri_par = peri_par > r_out
-    cond0_apo_par = apo_par < r_in
-    condizione1_peri = peri_par > r_in
-    condizione1_apo = apo_par < r_out
-    condizione2_peri = peri_par < r_in
-    condizione2_apo = apo_par > r_out
-    condizione3_peri = peri_par < r_in
-    condizione31_apo =  apo_par < r_out
-    condizione32_apo = apo_par > r_in
-    condizione41_peri = peri_par < r_out
-    condizione42_peri = peri_par > r_in
-    condizione4_apo = apo_par > r_out
-    
-    if (cond0_peri_par|cond0_apo_par): 
-        phi = 0
-        return(phi) 
-    
-    if (condizione1_peri and condizione1_apo):
-        phi = 1
-        return(phi)
-    elif (condizione2_peri and condizione2_apo):
-        phi = (E_out_par - E_in_par -e *(np.sin(E_out_par) - np.sin(E_in_par)))/np.pi
-        return(phi)
-    elif (condizione3_peri and (condizione31_apo and condizione32_apo)):
-        phi = 1 - (E_in_par - e*(np.sin(E_in_par)))/np.pi
-        return(phi)
-    elif ((condizione41_peri and condizione42_peri) and condizione4_apo):
-        phi = (E_out_par - e*(np.sin(E_out_par)))/np.pi
-        return(phi)
-    else: 
-        print('i dont really know what to print')
-        phi = phi
-        return(phi)
+    def get_phi_parent(self, a,e, r_in, r_out):
+        
+        E_out_par = np.arccos((a - r_out)/(a*e))
+        E_in_par = np.arccos((a - r_in)/(a*e))
+        
+        peri_par = a*(1-e)
+        apo_par = a*(1+e)
+        
+        cond0_peri_par = peri_par > r_out
+        cond0_apo_par = apo_par < r_in
+        condition1_peri = peri_par > r_in
+        condition1_apo = apo_par < r_out
+        condition2_peri = peri_par < r_in
+        condition2_apo = apo_par > r_out
+        condition3_peri = peri_par < r_in
+        condition31_apo =  apo_par < r_out
+        condition32_apo = apo_par > r_in
+        condition41_peri = peri_par < r_out
+        condition42_peri = peri_par > r_in
+        condition4_apo = apo_par > r_out
+        
+        if (cond0_peri_par|cond0_apo_par): 
+            self.phi = 0
+            return(self.phi)
+        
+        if (condition1_peri and condition1_apo):
+            self.phi = 1
+            return(self.phi)
+        elif (condition2_peri and condition2_apo):
+            self.phi = (E_out_par - E_in_par -e *(np.sin(E_out_par) - np.sin(E_in_par)))/np.pi
+            return(self.phi)
+        elif (condition3_peri and (condition31_apo and condition32_apo)):
+            return(self.phi)
+        elif ((condition41_peri and condition42_peri) and condition4_apo):
+            self.phi = (E_out_par - e*(np.sin(E_out_par)))/np.pi
+            return(self.phi)
+        else: 
+            print('I dont really know what to print...')
+            return(self.phi)
 
 
 # ## Radar Main
@@ -391,210 +467,210 @@ def get_phi_new(a,e, r_in, r_out):
 # 
 # It gives as outputs:
 # * day_list (list of epoch after fragmentation, in Days)
-# * global_CSI_cloud_only_list (weights are considered)
-# * global_CSI_cloud_only_list_no_weights (weights are all set to one)
-# * global_CSI_list (cloud + background CSI, weights are considered)
-# * global_CSI_list_no_weights (cloud + background CSI, weights are all set to one)
+# * global_csi_cloud_only_list (weights are considered)
+# * global_csi_cloud_only_list_no_weights (weights are all set to one)
+# * global_csi_list (cloud + background csi, weights are considered)
+# * global_csi_list_no_weights (cloud + background csi, weights are all set to one)
 # * ratios_list (percentage FEI values)
 
-# In[ ]:
+# In[21]:
 
 
-def radar_main(nube, h_coll, s_min, h_max, piece_of_string):
-    thresh = threshold_radar(h_coll,s_min,h_max) #minimum detectable size for a given rho_frag
+    def radar(self, parent_mass, parent_e, parent_inc, cloud_name, h_frag, elevation, s_min, h_max, piece_of_string):
 
-    print('In this case, the minimum detectable size for a fragment at h_frag is ABOUT ', thresh, 'cm')
+        object = self.ComputeFei
 
-    global_CSI_list = []
-    global_CSI_list_no_weights = []
-    global_CSI_cloud_only_list = []
-    global_CSI_cloud_only_list_no_weights = []
-    
-    day_list = []
-    ratios_list = []
-    ratios_no_weights_list = []
-    
-    mass_parent = 2000
-    a_parent = h_coll + r_e
-    e_parent = 0.00003
-    inc_parent = 80.3
-    
-    CSI_background, CSI_background_no_weights = np.loadtxt('/Users/luigigisolfi/' + str(nube) + '/CSI_out/CSI0_radar' + piece_of_string + '.out', unpack = True, usecols = (0,1))
-    CSI_background_array = np.array(CSI_background)
-    CSI_background_no_weights_array = np.array(CSI_background_no_weights)
-    
-    if os.path.isdir('/Users/luigigisolfi/' + str(nube) + '/figures/radar' + piece_of_string):
-        print('path for figures already exists!')
-    else:
-        os.mkdir('/Users/luigigisolfi/' + str(nube) + '/figures/radar' + piece_of_string)
+        r_e = self.r_e
+        elevation = object.SetObservingNetwork.constant_elevation(elevation)
+        clouds_folder_path = self.clouds_folder_path
         
-    if os.path.isdir('/Users/luigigisolfi/' + str(nube)+ '/weights/radar' + piece_of_string):
-        print('path for weights already exists!')
-    else:
-        os.mkdir('/Users/luigigisolfi/' + str(nube)+ '/weights/radar' + piece_of_string)
+        radar_threshold_value = self.radar_threshold(h_frag,s_min,h_max) #minimum detectable size for a given rho_frag
+    
+        print(f'The minimum detectable size for a fragment at {h_frag} km is: {radar_threshold_value} cm\n')
+    
+        self.global_csi_list = []
+        self.global_csi_list_no_weights = []
+        self.global_csi_cloud_only_list = []
+        self.global_csi_cloud_only_list_no_weights = []
         
-    for filename in os.listdir('/Users/luigigisolfi/' + str(nube)):
-        f = os.path.join('/Users/luigigisolfi/' + str(nube), filename)
-        if (os.path.isdir(f) == True):
-            print(str(f) + ' is a directory!')
-            continue
-        else:
-            if (filename[6:9].isnumeric() and float(filename[6:9]) > 100):
+        self.day_list = []
+        self.ratios_list = []
+        self.ratios_no_weights_list = []
+        
+        parent_mass = object.SetParent.mass(2000) # parent_mass = 2000 kg
+        parent_a = object.SetParent.semi_major_axis(h_frag)
+        parent_e =  object.SetParent.eccentricity(parent_e) #parent_e = 0.00003
+        parent_inc = object.SetParent.inclination(parent_inc) # parent_inc = 80.3
+
+        cloud_folder_path = os.path.join(clouds_folder_path, cloud_name)
+        csi_background_folder = os.path.join(cloud_folder_path, 'csi_out')
+        background_filename = 'csi0_radar' + piece_of_string + '.out'
+        figures_folder_path = os.path.join(clouds_folder_path, 'figures')
+        weights_folder_path = os.path.join(clouds_folder_path, 'weights')
+
+        csi_background, csi_background_no_weights = np.loadtxt(os.path.join(csi_background_folder, background_filename), unpack = True, usecols = (0,1))
+        csi_background_array = np.array(csi_background)
+        csi_background_no_weights_array = np.array(csi_background_no_weights)
+        
+        if not os.path.isdir(figures_folder_path + '/radar' + piece_of_string):
+            os.mkdir(figures_folder_path + '/radar' + piece_of_string)
+            
+        if not os.path.isdir(weights_folder_path + '/radar' + piece_of_string):
+            os.mkdir(weights_folder_path + '/radar' + piece_of_string)
+
+        for filename in os.listdir(cloud_folder_path):
+            print(f'Processing cloud file: {filename}')
+            f = os.path.join('/Users/luigigisolfi/' + str(cloud_name), filename)
+            if (os.path.isdir(f) == True):
+                print(f'File: {f} is a directory. Skipping...\n')
                 continue
-            elif (f[-4:] == '.fla' and filename != 'cloud_init.fla' and filename != 'fragment.fla' and filename != 'delta_v_1200_km.fla'):
-                print(filename)
-                np.set_printoptions(threshold=np.inf)
-                epoch, n, area, mass, a, e, inc, Omega, omega, M = np.loadtxt(f, unpack = True, usecols = (0,1,2,3,4,5,6,7,8,9))
-                f_weights = os.path.join('/Users/luigigisolfi/' + str(nube) + '/weights/radar' + piece_of_string + '/' + filename[:-4] + '_weights.fla')
-            else: 
-                continue
+            else:
+                if (filename[6:9].isnumeric() and float(filename[6:9]) > 100): # process only the first 100 days. 
+                    continue
+                elif (f[-4:] == '.fla' and filename != 'cloud_init.fla' and filename != 'fragment.fla' and filename != 'delta_v_1200_km.fla'):
+                    np.set_printoptions(threshold=np.inf)
+                    epoch, n, area, mass, a, e, inc, Omega, omega, M = np.loadtxt(f, unpack = True, usecols = (0,1,2,3,4,5,6,7,8,9))
+                    f_weights = weights_folder_path + '/radar' + piece_of_string + '/' + filename[:-4] + '_weights.fla'
+                else: 
+                    continue
+    
+            sizes = np.sqrt(4*area/np.pi) #area in m^2, sizes in m
+            sizes = sizes*100 #in cm
+            sizes_cond = sizes >=1 
+            sensor_cond = a-r_e < 1200
+            combined = sizes_cond & sensor_cond  
+            e_cond = e <= 0.5
+            combined = combined & e_cond
+            a = a[combined]        
+            sizes = sizes[combined]
+            e = e[combined]
+            inc = inc[combined]
+            mass = mass[combined]
+    
+            weights = list(map(self.w_radar, sizes,a))
+    
+            csi_shell_list = []
+            csi_shell_list_no_weights = []
+            csi_parent_list = []
+            csi_parent_list_no_weights = []
+            csi_post_list= []
+            csi_post_list_no_weights = []
+            csi_pre_list = []
+    
+            no_weights = np.ones(len(weights))
+    
+            np.set_printoptions(threshold=np.inf)
+    
+            array = np.transpose(np.array([sizes, weights])) #array with sizes and associated weights
+            
+            with open(weights_folder_path + '/radar' + piece_of_string + '/' + str(filename[:-4]) + '_weights.fla', 'w') as fw:
+            
+                for line in array:
+                    fw.writelines(str(line)[1:-1] + '\n')
+    
+                for r_in in range(200 + r_e, 1200 + r_e, 50): # define the shells in the range 200 - 1200 km (radar shell range)
+                    
+                    r_out = r_in + 50 
+                    
+                    f_csi_shell = self.fractional_csi(mass,a,e,inc,weights, r_in, r_out) #all objects weighted fractional csi on a single shell
+                    f_csi_shell_array = np.array(f_csi_shell) #make it into array so as to perform operations on it later on
+                    
+                    f_csi_shell_no_weights =self.fractional_csi(mass,a,e,inc,no_weights, r_in, r_out)#all objects fractional csi (w=1) on a single shell
+                    f_csi_shell_no_weights_array = np.array(f_csi_shell_no_weights)
+                    
+                    f_csi_shell_parent = 0 
+                    f_csi_shell_parent_no_weights = self.parent_fractional_csi(parent_mass,parent_a,parent_e,parent_inc,1,r_in,r_out) #parent object csi (w =1)
+    
+                    total_csi_shell = np.sum(f_csi_shell_array)  #computing sum on j of (Post_j-Pre_j) = (Frag_j - Parent_j) on every shell j 
+                    total_csi_shell_no_weights = np.sum(f_csi_shell_no_weights_array) #same but w = 1
+                          
+                    csi_shell_list.append(total_csi_shell) #append the result into a list made of each day's results
+                    csi_shell_list_no_weights.append(total_csi_shell_no_weights) #same as above with w = 1
+    
+                    csi_parent_list.append(f_csi_shell_parent)
+                    csi_parent_list_no_weights.append(f_csi_shell_parent_no_weights)
                 
-        sizes = np.sqrt(4*area/np.pi) #area in m^2, sizes in m
-        sizes = sizes*100 #in cm
-        sizes_cond = sizes >=1 
-        sensor_cond = a-r_e < 1200
-        combined = sizes_cond & sensor_cond  
-        e_cond = e <= 0.5
-        combined = combined & e_cond
-        a = a[combined]        
-        sizes = sizes[combined]
-        e = e[combined]
-        inc = inc[combined]
-        mass = mass[combined]
-
-        weights = list(map(w_radar, sizes,a))
-
-        CSI_shell_list = []
-        CSI_shell_list_no_weights = []
-        CSI_parent_list = []
-        CSI_parent_list_no_weights = []
-        CSI_post_list= []
-        CSI_post_list_no_weights = []
-        CSI_pre_list = []
-
-        no_weights = np.ones(len(weights))
-
-        np.set_printoptions(threshold=np.inf)
-
-        array = np.transpose(np.array([sizes, weights])) #array with sizes and associated weights
+                csi_shell_list_array = np.array(csi_shell_list) #make list into array so as to perform operations later on
+                csi_shell_list_no_weights_array = np.array(csi_shell_list_no_weights)  #make list into array so as to perform operations later on
+                
+                csi_parent_list_array = np.array(csi_parent_list)
+                csi_parent_list_no_weights_array = np.array(csi_parent_list_no_weights)
+                
+                csi_background_array = csi_background_array + csi_parent_list_array #made of master + parent
+                csi_background_no_weights_array = csi_background_no_weights_array + csi_parent_list_no_weights_array #made of master + parent
+    
+                csi_post = csi_background_array + csi_shell_list_array - csi_parent_list_array #add cloud, subtract parent
+                csi_pre = csi_background_array 
+    
+                csi_post_no_weights = csi_background_no_weights_array + csi_shell_list_no_weights_array - csi_parent_list_no_weights_array #add cloud, subtract parent
+                csi_pre_no_weights = csi_background_no_weights_array 
+                
+                csi_post_list.append(csi_post)
+                csi_post_list_no_weights.append(csi_post_no_weights)
+                csi_pre_list.append(csi_pre)
+    
+                ratios = (csi_post - csi_pre)/csi_pre
+                ratios_no_weights = (csi_post_no_weights - csi_pre_no_weights)/csi_pre_no_weights
+                                                
+                self.ratios_list.append(ratios) #put them in a list (every element contains the ratio for each altitude at each day)
+                self.ratios_no_weights_list.append(ratios_no_weights)
+                                                
+            array_csi_post_pre = np.transpose(np.array([csi_post_list, csi_pre_list]))
+    
+            if float(filename[6:9]) <= 100 and float(filename[6:9]) > 1:
+                with open(filename, 'w') as fw:
+                    for line in array_csi_post_pre:
+                        fw.writelines(str(line)[2:-2] + '\n')
         
-        with open('/Users/luigigisolfi/' + str(nube)+ '/weights/radar' + piece_of_string + '/' + str(filename[:-4]) + '_weights.fla', 'w') as fw:
+            global_csi_cloud_only = np.sum(csi_shell_list_array) #sum of the cumulative csi on all shells (only Frag - Parent)
+            global_csi_cloud_only_no_weights = np.sum(csi_shell_list_no_weights_array) #same 
+    
+            global_csi = np.sum(np.array(csi_post_list)) #sum of the cumulative csi on all shells 
+            global_csi_no_weights = np.sum(np.array(csi_post_list_no_weights)) #same 
+            
+            #outputs to be used in plotter function
+            self.global_csi_cloud_only_list.append(global_csi_cloud_only)
+            self.global_csi_cloud_only_list_no_weights.append(global_csi_cloud_only_no_weights)
+            self.global_csi_list.append(global_csi) #append it for each day
+            self.global_csi_list_no_weights.append(global_csi_no_weights)
+            #day_list.append(float(filename[6:9])) #list of days
+            self.day_list.append(float(filename[6:9])) #list of days
+    
+        array_cumulative_cloud_csi = np.transpose(np.array([self.day_list,self.global_csi_cloud_only_list]))
+        array_cumulative_cloud_csi_no_weights = np.transpose(np.array([self.day_list,self.global_csi_cloud_only_list_no_weights]))
+        array_global_csi = np.transpose(np.array([self.day_list, self.global_csi_list]))
         
-            for line in array:
+        with open(cloud_folder_path + '/radar_array_global_csi_cloud_only' + piece_of_string, 'w') as fw:
+            for line in array_cumulative_cloud_csi:
                 fw.writelines(str(line)[1:-1] + '\n')
-
-            for r_in in range(200 + 6378,1200 + 6378,50):
-                
-                r_out = r_in + 50 
-                
-                f_CSI_shell = fractional_CSI(mass,a,e,inc,weights, r_in, r_out) #all objects weighted fractional CSI on a single shell
-                f_CSI_shell_array = np.array(f_CSI_shell) #make it into array so as to perform operations on it later on
-                
-                f_CSI_shell_no_weights =fractional_CSI(mass,a,e,inc,no_weights, r_in, r_out)#all objects fractional CSI (w=1) on a single shell
-                f_CSI_shell_no_weights_array = np.array(f_CSI_shell_no_weights)
-                
-                f_CSI_shell_parent = 0 
-                f_CSI_shell_parent_no_weights = fractional_CSI_new(mass_parent,a_parent,e_parent,inc_parent,1,r_in,r_out) #parent object CSI (w =1)
-
-                total_CSI_shell = np.sum(f_CSI_shell_array)  #computing sum on j of (Post_j-Pre_j) = (Frag_j - Parent_j) on every shell j 
-                total_CSI_shell_no_weights = np.sum(f_CSI_shell_no_weights_array) #same but w = 1
-                      
-                CSI_shell_list.append(total_CSI_shell) #append the result into a list made of each day's results
-                CSI_shell_list_no_weights.append(total_CSI_shell_no_weights) #same as above with w = 1
-
-                CSI_parent_list.append(f_CSI_shell_parent)
-                CSI_parent_list_no_weights.append(f_CSI_shell_parent_no_weights)
             
-            CSI_shell_list_array = np.array(CSI_shell_list) #make list into array so as to perform operations later on
-            CSI_shell_list_no_weights_array = np.array(CSI_shell_list_no_weights)  #make list into array so as to perform operations later on
-            
-            CSI_parent_list_array = np.array(CSI_parent_list)
-            CSI_parent_list_no_weights_array = np.array(CSI_parent_list_no_weights)
-            
-            CSI_background_array = CSI_background_array + CSI_parent_list_array #made of master + parent
-            CSI_background_no_weights_array = CSI_background_no_weights_array + CSI_parent_list_no_weights_array #made of master + parent
-
-            CSI_post = CSI_background_array + CSI_shell_list_array - CSI_parent_list_array #add cloud, subtract parent
-            CSI_pre = CSI_background_array 
-
-            CSI_post_no_weights = CSI_background_no_weights_array + CSI_shell_list_no_weights_array - CSI_parent_list_no_weights_array #add cloud, subtract parent
-            CSI_pre_no_weights = CSI_background_no_weights_array 
-            
-            CSI_post_list.append(CSI_post)
-            CSI_post_list_no_weights.append(CSI_post_no_weights)
-            CSI_pre_list.append(CSI_pre)
-
-            ratios = (CSI_post - CSI_pre)/(CSI_pre)
-            ratios_no_weights = (CSI_post_no_weights - CSI_pre_no_weights)/(CSI_pre_no_weights)
-                                            
-            ratios_list.append(ratios) #put them in a list (every element contains the ratio for each altitude at each day)
-            ratios_no_weights_list.append(ratios_no_weights)
-                                            
-        array_CSI_post_pre = np.transpose(np.array([CSI_post_list, CSI_pre_list]))
+        with open(cloud_folder_path + '/radar_array_global_csi_cloud_only_list_no_weights' + piece_of_string, 'w') as fw:
+            for line in array_cumulative_cloud_csi_no_weights:
+                fw.writelines(str(line)[1:-1] + '\n')
         
-        # if filename[6:9] == '100' or filename[6:9] == '001':
-        #    with open('/Users/luigigisolfi/' + str(nube)+ '/radar_CSI_post_pre_' + filename[6:9] +piece_of_string, 'w') as fw:
-        #        for line in array_CSI_post_pre:
-        #            fw.writelines(str(line)[2:-2] + '\n')
-
-        if float(filename[6:9]) <= 100 and float(filename[6:9]) > 1:
-            print(filename)
-            with open(filename, 'w') as fw:
-                for line in array_CSI_post_pre:
-                    fw.writelines(str(line)[2:-2] + '\n')
+        with open(cloud_folder_path +  '/radar_array_global_csi' + piece_of_string, 'w') as fw:
+            for line in array_global_csi:
+                fw.writelines(str(line)[1:-1] + '\n')
+                
+        pos_1 = self.day_list.index(1) #at day 1
+        pos_100 = self.day_list.index(100) #at day 100
     
-        global_CSI_cloud_only = np.sum(CSI_shell_list_array) #sum of the cumulative csi on all shells (only Frag - Parent)
-        global_CSI_cloud_only_no_weights = np.sum(CSI_shell_list_no_weights_array) #same 
+        ratios_100 = self.ratios_list[pos_100]
+        ratios_1 = self.ratios_list[pos_1]
+        shells = np.arange(250,1250,50)
 
-        global_CSI = np.sum(np.array(CSI_post_list)) #sum of the cumulative csi on all shells 
-        global_CSI_no_weights = np.sum(np.array(CSI_post_list_no_weights)) #same 
+        array_shells_ratios_100 = np.transpose(np.array([shells,ratios_100]))
+        array_shells_ratios_1 = np.transpose(np.array([shells,ratios_1]))
         
-        #outputs to be used in plotter function
-        global_CSI_cloud_only_list.append(global_CSI_cloud_only)
-        global_CSI_cloud_only_list_no_weights.append(global_CSI_cloud_only_no_weights)
-        global_CSI_list.append(global_CSI) #append it for each day
-        global_CSI_list_no_weights.append(global_CSI_no_weights)
-        #day_list.append(float(filename[6:9])) #list of days
-        day_list.append(float(filename[6:9])) #list of days
-    print(day_list)
-
-    array_cumulative_cloud_CSI = np.transpose(np.array([day_list,global_CSI_cloud_only_list]))
-    array_cumulative_cloud_CSI_no_weights = np.transpose(np.array([day_list,global_CSI_cloud_only_list_no_weights]))
-    array_global_CSI = np.transpose(np.array([day_list, global_CSI_list]))
-    
-    with open('/Users/luigigisolfi/' + str(nube)+ '/radar_array_global_CSI_cloud_only' + piece_of_string, 'w') as fw:
-        for line in array_cumulative_cloud_CSI:
-            fw.writelines(str(line)[1:-1] + '\n')
+        with open(cloud_folder_path +  '/array_shells_ratios_100_radar' + piece_of_string, 'w') as fw:
+            for line in array_shells_ratios_100:
+                fw.writelines(str(line)[1:-1] + '\n')
+        with open(cloud_folder_path + '/array_shells_ratios_1_radar' + piece_of_string, 'w') as fw:
+            for line in array_shells_ratios_1:
+                fw.writelines(str(line)[1:-1] + '\n')
         
-    with open('/Users/luigigisolfi/' + str(nube)+ '/radar_array_global_CSI_cloud_only_list_no_weights' + piece_of_string, 'w') as fw:
-        for line in array_cumulative_cloud_CSI_no_weights:
-            fw.writelines(str(line)[1:-1] + '\n')
+        return(self.day_list, self.global_csi_cloud_only_list, self.global_csi_cloud_only_list_no_weights, self.global_csi_list, self.global_csi_list_no_weights, self.ratios_list)
     
-    with open('/Users/luigigisolfi/' + str(nube)+  '/radar_array_global_CSI' + piece_of_string, 'w') as fw:
-        for line in array_global_CSI:
-            fw.writelines(str(line)[1:-1] + '\n')
-
-    pos_1 = day_list.index(1) #at day 1
-    pos_100 = day_list.index(100) #at day 100
-
-    ratios_100 = ratios_list[pos_100]
-    ratios_1 = ratios_list[pos_1]
-    shells = np.arange(250,1250,50)
-    print(len(shells), len(ratios_1))
-    print(len(shells), len(ratios_100))
-
-    array_shells_ratios_100 = np.transpose(np.array([shells,ratios_100]))
-    array_shells_ratios_1 = np.transpose(np.array([shells,ratios_1]))
-    
-    with open('/Users/luigigisolfi/' + str(nube)+ '/array_shells_ratios_100_radar' + piece_of_string, 'w') as fw:
-        for line in array_shells_ratios_100:
-            fw.writelines(str(line)[1:-1] + '\n')
-    with open('/Users/luigigisolfi/' + str(nube)+ '/array_shells_ratios_1_radar' + piece_of_string, 'w') as fw:
-        for line in array_shells_ratios_1:
-            fw.writelines(str(line)[1:-1] + '\n')
-    
-    return(day_list, global_CSI_cloud_only_list, global_CSI_cloud_only_list_no_weights, global_CSI_list, global_CSI_list_no_weights, ratios_list)
-
 
 # ## Optical Main
 # 
@@ -610,216 +686,217 @@ def radar_main(nube, h_coll, s_min, h_max, piece_of_string):
 # 
 # It gives as outputs:
 # * day_list (list of epoch after fragmentation, in Days)
-# * global_CSI_cloud_only_list (weights are considered)
-# * global_CSI_cloud_only_list_no_weights (weights are all set to one)
-# * global_CSI_list (cloud + background CSI, weights are considered)
-# * global_CSI_list_no_weights (cloud + background CSI, weights are all set to one)
+# * global_csi_cloud_only_list (weights are considered)
+# * global_csi_cloud_only_list_no_weights (weights are all set to one)
+# * global_csi_list (cloud + background csi, weights are considered)
+# * global_csi_list_no_weights (cloud + background csi, weights are all set to one)
 # * ratios_list (percentage FEI values)
 
-# In[ ]:
+# In[23]:
 
 
-def optical_main(nube, h_coll, s_min,h_max, piece_of_string):
-    
-    thresh = threshold(h_coll,s_min,h_max) #minimum detectable size for a given rho_frag
-    global_CSI_list = []
-    global_CSI_list_no_weights = []
-    global_CSI_cloud_only_list = []
-    global_CSI_cloud_only_list_no_weights = []
-    
-    day_list = []
-    ratios_list = []
-    ratios_no_weights_list = []
-    
-    mass_parent = 2000
-    a_parent = h_coll + r_e
-    e_parent = 0.00003
-    inc_parent = 80.3
-    
-    CSI_background, CSI_background_no_weights = np.loadtxt('/Users/luigigisolfi/' + str(nube) + '/CSI_out/CSI0_optical' + piece_of_string + '.out', unpack = True, usecols = (0,1))
-    CSI_background_array = np.array(CSI_background)
-    CSI_background_no_weights_array = np.array(CSI_background_no_weights)
-    
-    omega_j_elem = w_t_sig(h_coll) #associated w_t_sig weight (depending on wether we are in LOW LEO, MED LEO or HIGH LEO)
-    
-    if os.path.isdir('/Users/luigigisolfi/' + str(nube) + '/figures/optical' + piece_of_string):
-        print('path for figures already exists!')
-    else:
-        os.mkdir('/Users/luigigisolfi/' + str(nube) + '/figures/optical' + piece_of_string)
-        
-    if os.path.isdir('/Users/luigigisolfi/' + str(nube)+ '/weights/optical' + piece_of_string):
-        print('path for weights already exists!')
-    else:
-        os.mkdir('/Users/luigigisolfi/' + str(nube)+ '/weights/optical' + piece_of_string)
-    
-    for filename in os.listdir('/Users/luigigisolfi/' + str(nube)):
-        f = os.path.join('/Users/luigigisolfi/' + str(nube), filename)
-        if (os.path.isdir(f) == True):
-            print(str(f) + ' is a directory!')
-            continue
+    def optical_main(self, nube, h_coll, s_min,h_max, piece_of_string):
+
+        optical_threshold_value = self.optical_threshold(h_coll,s_min,h_max) #minimum detectable size for a given rho_frag
+        global_csi_list = []
+        global_csi_list_no_weights = []
+        global_csi_cloud_only_list = []
+        global_csi_cloud_only_list_no_weights = []
+
+        day_list = []
+        ratios_list = []
+        ratios_no_weights_list = []
+
+        parent_mass = 2000
+        parent_a = h_coll + r_e
+        parent_e = 0.00003
+        parent_inc = 80.3
+
+        csi_background, csi_background_no_weights = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name) + '/csi_out/csi0_optical' + piece_of_string + '.out', unpack = True, usecols = (0,1))
+        csi_background_array = np.array(csi_background)
+        csi_background_no_weights_array = np.array(csi_background_no_weights)
+
+        omega_j_elem = w_t_sig(h_coll) #associated w_t_sig weight (depending on wether we are in LOW LEO, MED LEO or HIGH LEO)
+
+        if os.path.isdir('/Users/luigigisolfi/' + str(cloud_name) + '/figures/optical' + piece_of_string):
+            print('path for figures already exists!')
         else:
-            if (filename[6:9].isnumeric() and float(filename[6:9]) > 100):
+            os.mkdir('/Users/luigigisolfi/' + str(cloud_name) + '/figures/optical' + piece_of_string)
+
+        if os.path.isdir('/Users/luigigisolfi/' + str(cloud_name)+ '/weights/optical' + piece_of_string):
+            print('path for weights already exists!')
+        else:
+            os.mkdir('/Users/luigigisolfi/' + str(cloud_name)+ '/weights/optical' + piece_of_string)
+
+        for filename in os.listdir('/Users/luigigisolfi/' + str(cloud_name)):
+            f = os.path.join('/Users/luigigisolfi/' + str(cloud_name), filename)
+            if (os.path.isdir(f) == True):
+                print(str(f) + ' is a directory!')
                 continue
-            elif (f[-4:] == '.fla' and filename != 'cloud_init.fla' and filename != 'fragment.fla'):
-                print(filename)
+            else:
+                if (filename[6:9].isnumeric() and float(filename[6:9]) > 100):
+                    continue
+                elif (f[-4:] == '.fla' and filename != 'cloud_init.fla' and filename != 'fragment.fla'):
+                    print(filename)
+                    np.set_printoptions(threshold=np.inf)
+                    epoch, n, area, mass, a, e, inc, Omega, omega, M = np.loadtxt(f, unpack = True, usecols = (0,1,2,3,4,5,6,7,8,9))
+                    f_weights = os.path.join('/Users/luigigisolfi/' + str(cloud_name) + '/weights/optical' + piece_of_string + '/' + filename[:-4] + '_weights.fla')
+
+                else:
+                    continue
+
+                sizes = np.sqrt(4*area/np.pi) #area in m^2, sizes in m
+                sizes = sizes*100 #in cm
+                sizes_cond = sizes >=1
+                sensor_cond = a-r_e >=1200
+                combined = sizes_cond & sensor_cond
+                e_cond = e <= 0.5
+                combined = combined & e_cond
+                a = a[combined]
+
+                sizes = sizes[combined]
+                e = e[combined]
+                inc = inc[combined]
+                mass = mass[combined]
+
+                omega_i_map = list(map(w_e_rso, sizes,a))
+                omega_i_map = np.array(omega_i_map)
+
+                omega_j_map = np.full(shape= len(omega_i_map), fill_value=omega_j_elem,dtype=float)
+
+                weights = list(map(get_omega_optical_sum, omega_i_map, omega_j_map))
+
                 np.set_printoptions(threshold=np.inf)
-                epoch, n, area, mass, a, e, inc, Omega, omega, M = np.loadtxt(f, unpack = True, usecols = (0,1,2,3,4,5,6,7,8,9))
-                f_weights = os.path.join('/Users/luigigisolfi/' + str(nube) + '/weights/optical' + piece_of_string + '/' + filename[:-4] + '_weights.fla')
-                
-            else: 
-                continue
-                        
-            sizes = np.sqrt(4*area/np.pi) #area in m^2, sizes in m
-            sizes = sizes*100 #in cm
-            sizes_cond = sizes >=1
-            sensor_cond = a-r_e >=1200
-            combined = sizes_cond & sensor_cond  
-            e_cond = e <= 0.5
-            combined = combined & e_cond
-            a = a[combined]
-        
-            sizes = sizes[combined]
-            e = e[combined]
-            inc = inc[combined]
-            mass = mass[combined]
-        
-            omega_i_map = list(map(w_E_RSO, sizes,a))
-            omega_i_map = np.array(omega_i_map)
-            
-            omega_j_map = np.full(shape= len(omega_i_map), fill_value=omega_j_elem,dtype=float)
-            
-            weights = list(map(get_omega_optical_sum, omega_i_map, omega_j_map))
 
-            np.set_printoptions(threshold=np.inf)
+                array = np.transpose(np.array([sizes, weights])) #array with sizes and associated weights
 
-            array = np.transpose(np.array([sizes, weights])) #array with sizes and associated weights
-            
-            with open('/Users/luigigisolfi/' + str(nube)+ '/weights/optical' + piece_of_string + '/' + str(filename[:-4]) + '_weights.fla', 'w') as fw:
-                for line in array:
-                    fw.writelines(str(line)[1:-1] + '\n')
+                with open('/Users/luigigisolfi/' + str(cloud_name)+ '/weights/optical' + piece_of_string + '/' + str(filename[:-4]) + '_weights.fla', 'w') as fw:
+                    for line in array:
+                        fw.writelines(str(line)[1:-1] + '\n')
 
-            CSI_shell_list = []
-            CSI_shell_list_no_weights = []
-            CSI_parent_list = []
-            CSI_parent_list_no_weights = []
-            CSI_post_list= []
-            CSI_post_list_no_weights = []
-            CSI_pre_list = []            
-            no_weights = np.ones(len(weights))
+                csi_shell_list = []
+                csi_shell_list_no_weights = []
+                csi_parent_list = []
+                csi_parent_list_no_weights = []
+                csi_post_list= []
+                csi_post_list_no_weights = []
+                csi_pre_list = []
+                no_weights = np.ones(len(weights))
 
-            
-            for r_in in range(1200 + 6378,2000 + 6378,50):
-                
-                r_out = r_in + 50 
-                
-                f_CSI_shell = fractional_CSI(mass,a,e,inc, weights, r_in, r_out) #all objects weighted fractional CSI on a single shell
-                f_CSI_shell_array = np.array(f_CSI_shell) #make it into array so as to perform operations on it later on
-                
-                f_CSI_shell_no_weights =fractional_CSI(mass,a,e,inc, no_weights, r_in, r_out)#all objects fractional CSI (w=1) on a single shell
-                f_CSI_shell_no_weights_array = np.array(f_CSI_shell_no_weights)
-                
-                f_CSI_shell_parent = 0 
-                f_CSI_shell_parent_no_weights = fractional_CSI_new(mass_parent,a_parent,e_parent,inc_parent,1, r_in,r_out) #parent object CSI (w =1)
 
-                total_CSI_shell = np.sum(f_CSI_shell_array)  #computing sum on j of (Post_j-Pre_j) = (Frag_j - Parent_j) on every shell j 
-                total_CSI_shell_no_weights = np.sum(f_CSI_shell_no_weights_array) #same but w = 1
-                      
-                CSI_shell_list.append(total_CSI_shell) #append the result into a list made of each day's results
-                CSI_shell_list_no_weights.append(total_CSI_shell_no_weights) #same as above with w = 1
+                for r_in in range(1200 + 6378,2000 + 6378,50):
 
-                CSI_parent_list.append(f_CSI_shell_parent)
-                CSI_parent_list_no_weights.append(f_CSI_shell_parent_no_weights)
-            
-            CSI_shell_list_array = np.array(CSI_shell_list) #make list into array so as to perform operations later on
-            CSI_shell_list_no_weights_array = np.array(CSI_shell_list_no_weights)  #make list into array so as to perform operations later on
-            
-            CSI_parent_list_array = np.array(CSI_parent_list)
-            CSI_parent_list_no_weights_array = np.array(CSI_parent_list_no_weights)
-            
-            CSI_background_array = CSI_background_array + CSI_parent_list_array #made of master + parent
-            CSI_background_no_weights_array = CSI_background_no_weights_array + CSI_parent_list_no_weights_array #made of master + parent
+                    r_out = r_in + 50
 
-            CSI_post = CSI_background_array + CSI_shell_list_array - CSI_parent_list_array #add cloud, subtract parent
-            CSI_pre = CSI_background_array
+                    f_csi_shell = fractional_csi(mass,a,e,inc, weights, r_in, r_out) #all objects weighted fractional csi on a single shell
+                    f_csi_shell_array = np.array(f_csi_shell) #make it into array so as to perform operations on it later on
 
-            CSI_post_no_weights = CSI_background_no_weights_array + CSI_shell_list_no_weights_array - CSI_parent_list_no_weights_array #add cloud, subtract parent
-            CSI_pre_no_weights = CSI_background_no_weights_array 
-            
-            CSI_post_list.append(CSI_post)
-            CSI_post_list_no_weights.append(CSI_post_no_weights)
-            CSI_pre_list.append(CSI_pre)
+                    f_csi_shell_no_weights =fractional_csi(mass,a,e,inc, no_weights, r_in, r_out)#all objects fractional csi (w=1) on a single shell
+                    f_csi_shell_no_weights_array = np.array(f_csi_shell_no_weights)
 
-            ratios = (CSI_post - CSI_pre)/(CSI_pre)
+                    f_csi_shell_parent = 0
+                    f_csi_shell_parent_no_weights = parent_fractional_csi(parent_mass,parent_a,parent_e,parent_inc,1, r_in,r_out) #parent object csi (w =1)
 
-            ratios_no_weights = (CSI_post_no_weights - CSI_pre_no_weights)/(CSI_pre_no_weights)
-                                            
-            ratios_list.append(ratios) #put them in a list (every element contains the ratio for each altitude at each day)
-            ratios_no_weights_list.append(ratios_no_weights)
-                                            
-        array_CSI_post_pre = np.transpose(np.array([CSI_post_list, CSI_pre_list]))
+                    total_csi_shell = np.sum(f_csi_shell_array)  #computing sum on j of (Post_j-Pre_j) = (Frag_j - Parent_j) on every shell j
+                    total_csi_shell_no_weights = np.sum(f_csi_shell_no_weights_array) #same but w = 1
 
-        if filename[6:9] == '100' or filename[6:9] == '001':
-            with open('/Users/luigigisolfi/' + str(nube)+ '/optical_CSI_post_pre_' + filename[6:9] +piece_of_string, 'w') as fw:
-                for line in array_CSI_post_pre:
-                    fw.writelines(str(line)[2:-2] + '\n')
+                    csi_shell_list.append(total_csi_shell) #append the result into a list made of each day's results
+                    csi_shell_list_no_weights.append(total_csi_shell_no_weights) #same as above with w = 1
 
-        global_CSI_cloud_only = np.sum(CSI_shell_list_array) #sum of the cumulative csi on all shells (only Frag - Parent)
-        global_CSI_cloud_only_no_weights = np.sum(CSI_shell_list_no_weights_array) #same 
-    
-        global_CSI = np.sum(np.array(CSI_post_list)) #sum of the cumulative csi on all shells 
-        global_CSI_no_weights = np.sum(np.array(CSI_post_list_no_weights)) #same 
-        
-        #outputs to be used in plotter function
-        global_CSI_cloud_only_list.append(global_CSI_cloud_only)
-        global_CSI_cloud_only_list_no_weights.append(global_CSI_cloud_only_no_weights)
-        global_CSI_list.append(global_CSI) #append it for each day
-        global_CSI_list_no_weights.append(global_CSI_no_weights)
-        day_list.append(float(filename[6:9])) #list of days
-        
-    array_cumulative_cloud_CSI = np.transpose(np.array([day_list,global_CSI_cloud_only_list]))
-    array_cumulative_cloud_CSI_no_weights = np.transpose(np.array([day_list,global_CSI_cloud_only_list_no_weights]))
-    array_global_CSI = np.transpose(np.array([day_list, global_CSI_list]))
-    
-    with open('/Users/luigigisolfi/' + str(nube)+ '/optical_array_global_CSI_cloud_only' + piece_of_string, 'w') as fw:
-        for line in array_cumulative_cloud_CSI:
-            fw.writelines(str(line)[1:-1] + '\n')
-        
-    with open('/Users/luigigisolfi/' + str(nube)+ '/optical_array_global_CSI_cloud_only_list_no_weights' + piece_of_string, 'w') as fw:
-        for line in array_cumulative_cloud_CSI_no_weights:
-            fw.writelines(str(line)[1:-1] + '\n')
-    
-    with open('/Users/luigigisolfi/' + str(nube)+  '/optical_array_global_CSI' + piece_of_string, 'w') as fw:
-        for line in array_global_CSI:
-            fw.writelines(str(line)[1:-1] + '\n')
+                    csi_parent_list.append(f_csi_shell_parent)
+                    csi_parent_list_no_weights.append(f_csi_shell_parent_no_weights)
 
-    pos_1 = day_list.index(1) #at day 1
-    pos_100 = day_list.index(100) #at day 100
+                csi_shell_list_array = np.array(csi_shell_list) #make list into array so as to perform operations later on
+                csi_shell_list_no_weights_array = np.array(csi_shell_list_no_weights)  #make list into array so as to perform operations later on
 
-    ratios_100 = ratios_list[pos_100]
-    ratios_1 = ratios_list[pos_1]
-    shells = np.arange(1250,2050,50)
+                csi_parent_list_array = np.array(csi_parent_list)
+                csi_parent_list_no_weights_array = np.array(csi_parent_list_no_weights)
 
-    array_shells_ratios_100 = np.transpose(np.array([shells,ratios_100]))
-    array_shells_ratios_1 = np.transpose(np.array([shells,ratios_1]))
-    
-    with open('/Users/luigigisolfi/' + str(nube)+ '/array_shells_ratios_100_optical' + piece_of_string, 'w') as fw:
-        for line in array_shells_ratios_100:
-            fw.writelines(str(line)[1:-1] + '\n')
-    with open('/Users/luigigisolfi/' + str(nube)+ '/array_shells_ratios_1_optical' + piece_of_string, 'w') as fw:
-        for line in array_shells_ratios_1:
-            fw.writelines(str(line)[1:-1] + '\n')
+                csi_background_array = csi_background_array + csi_parent_list_array #made of master + parent
+                csi_background_no_weights_array = csi_background_no_weights_array + csi_parent_list_no_weights_array #made of master + parent
 
-    return(day_list, global_CSI_cloud_only_list, global_CSI_cloud_only_list_no_weights, global_CSI_list, global_CSI_list_no_weights, ratios_list)
+                csi_post = csi_background_array + csi_shell_list_array - csi_parent_list_array #add cloud, subtract parent
+                csi_pre = csi_background_array
+
+                csi_post_no_weights = csi_background_no_weights_array + csi_shell_list_no_weights_array - csi_parent_list_no_weights_array #add cloud, subtract parent
+                csi_pre_no_weights = csi_background_no_weights_array
+
+                csi_post_list.append(csi_post)
+                csi_post_list_no_weights.append(csi_post_no_weights)
+                csi_pre_list.append(csi_pre)
+
+                ratios = (csi_post - csi_pre)/(csi_pre)
+
+                ratios_no_weights = (csi_post_no_weights - csi_pre_no_weights)/(csi_pre_no_weights)
+
+                ratios_list.append(ratios) #put them in a list (every element contains the ratio for each altitude at each day)
+                ratios_no_weights_list.append(ratios_no_weights)
+
+            array_csi_post_pre = np.transpose(np.array([csi_post_list, csi_pre_list]))
+
+            if filename[6:9] == '100' or filename[6:9] == '001':
+                with open('/Users/luigigisolfi/' + str(cloud_name)+ '/optical_csi_post_pre_' + filename[6:9] +piece_of_string, 'w') as fw:
+                    for line in array_csi_post_pre:
+                        fw.writelines(str(line)[2:-2] + '\n')
+
+            global_csi_cloud_only = np.sum(csi_shell_list_array) #sum of the cumulative csi on all shells (only Frag - Parent)
+            global_csi_cloud_only_no_weights = np.sum(csi_shell_list_no_weights_array) #same
+
+            global_csi = np.sum(np.array(csi_post_list)) #sum of the cumulative csi on all shells
+            global_csi_no_weights = np.sum(np.array(csi_post_list_no_weights)) #same
+
+            #outputs to be used in plotter function
+            global_csi_cloud_only_list.append(global_csi_cloud_only)
+            global_csi_cloud_only_list_no_weights.append(global_csi_cloud_only_no_weights)
+            global_csi_list.append(global_csi) #append it for each day
+            global_csi_list_no_weights.append(global_csi_no_weights)
+            day_list.append(float(filename[6:9])) #list of days
+
+        array_cumulative_cloud_csi = np.transpose(np.array([day_list,global_csi_cloud_only_list]))
+        array_cumulative_cloud_csi_no_weights = np.transpose(np.array([day_list,global_csi_cloud_only_list_no_weights]))
+        array_global_csi = np.transpose(np.array([day_list, global_csi_list]))
+
+        with open('/Users/luigigisolfi/' + str(cloud_name)+ '/optical_array_global_csi_cloud_only' + piece_of_string, 'w') as fw:
+            for line in array_cumulative_cloud_csi:
+                fw.writelines(str(line)[1:-1] + '\n')
+
+        with open('/Users/luigigisolfi/' + str(cloud_name)+ '/optical_array_global_csi_cloud_only_list_no_weights' + piece_of_string, 'w') as fw:
+            for line in array_cumulative_cloud_csi_no_weights:
+                fw.writelines(str(line)[1:-1] + '\n')
+
+        with open('/Users/luigigisolfi/' + str(cloud_name)+  '/optical_array_global_csi' + piece_of_string, 'w') as fw:
+            for line in array_global_csi:
+                fw.writelines(str(line)[1:-1] + '\n')
+
+
+        pos_1 = day_list.index(1) #at day 1
+        pos_100 = day_list.index(100) #at day 100
+
+        ratios_100 = ratios_list[pos_100]
+        ratios_1 = ratios_list[pos_1]
+        shells = np.arange(1250,2050,50)
+
+        array_shells_ratios_100 = np.transpose(np.array([shells,ratios_100]))
+        array_shells_ratios_1 = np.transpose(np.array([shells,ratios_1]))
+
+        with open('/Users/luigigisolfi/' + str(cloud_name)+ '/array_shells_ratios_100_optical' + piece_of_string, 'w') as fw:
+            for line in array_shells_ratios_100:
+                fw.writelines(str(line)[1:-1] + '\n')
+        with open('/Users/luigigisolfi/' + str(cloud_name)+ '/array_shells_ratios_1_optical' + piece_of_string, 'w') as fw:
+            for line in array_shells_ratios_1:
+                fw.writelines(str(line)[1:-1] + '\n')
+
+        return(day_list, global_csi_cloud_only_list, global_csi_cloud_only_list_no_weights, global_csi_list, global_csi_list_no_weights, ratios_list)
 
 
 # ## Background Population FEI Computation
 # As done for the fragmentaiton cloud, we compute the FEI for each of the objects that were present in the atmosphere before the fragmentation event. These constitute the background population. 
 # As done above, this is computed for optical and/or radar.
 
-# In[ ]:
+# In[25]:
 
 
-def radar_main_background(nube, h_coll, s_min,h_max, piece_of_string, background_pop):
+def radar_background(nube, h_coll, s_min,h_max, piece_of_string, background_pop):
         
     if not os.path.isfile(background_pop):
         print('Could not find background population file. Aborting...')
@@ -854,23 +931,23 @@ def radar_main_background(nube, h_coll, s_min,h_max, piece_of_string, background
     
     no_weights = np.ones(len(weights))
 
-    with open('/Users/luigigisolfi/' + str(nube) + '/CSI_out' + '/CSI0_radar' + piece_of_string + '.out', 'w') as fw_CSI0:
+    with open('/Users/luigigisolfi/' + str(cloud_name) + '/csi_out' + '/csi0_radar' + piece_of_string + '.out', 'w') as fw_csi0:
         
         for r_in in range(200 + 6378,1200 + 6378,50):
             
             r_out = r_in + 50 
             
-            f_CSI_shell = fractional_CSI(mass,a,e,inc,weights, r_in, r_out) #all objects weighted fractional CSI on a single shell
-            f_CSI_shell_array = np.array(f_CSI_shell) #make it into array so as to perform operations on it later on
+            f_csi_shell = fractional_csi(mass,a,e,inc,weights, r_in, r_out) #all objects weighted fractional csi on a single shell
+            f_csi_shell_array = np.array(f_csi_shell) #make it into array so as to perform operations on it later on
             
-            f_CSI_shell_no_weights =fractional_CSI(mass,a,e,inc,no_weights, r_in, r_out)#all objects fractional CSI (w=1) on a single shell
-            f_CSI_shell_no_weights_array = np.array(f_CSI_shell_no_weights)
+            f_csi_shell_no_weights =fractional_csi(mass,a,e,inc,no_weights, r_in, r_out)#all objects fractional csi (w=1) on a single shell
+            f_csi_shell_no_weights_array = np.array(f_csi_shell_no_weights)
             
-            total_CSI_shell = np.sum(f_CSI_shell_array)  #computing sum on j of (Post_j-Pre_j) = (Frag_j - Parent_j) on every shell j 
-            total_CSI_shell_no_weights = np.sum(f_CSI_shell_no_weights_array) #same but w = 1
+            total_csi_shell = np.sum(f_csi_shell_array)  #computing sum on j of (Post_j-Pre_j) = (Frag_j - Parent_j) on every shell j 
+            total_csi_shell_no_weights = np.sum(f_csi_shell_no_weights_array) #same but w = 1
 
                      
-            fw_CSI0.writelines(str(total_CSI_shell) + ' ' + str(total_CSI_shell_no_weights) + '\n')
+            fw_csi0.writelines(str(total_csi_shell) + ' ' + str(total_csi_shell_no_weights) + '\n')
 
 def optical_main_background(nube, h_coll, s_min,h_max, piece_of_string, background_pop):
     
@@ -893,8 +970,8 @@ def optical_main_background(nube, h_coll, s_min,h_max, piece_of_string, backgrou
     a = a[combined]
     sizes = sizes[combined]
 
-    omega_i_list =[] #initialize w_E_RSO list
-    omega_i_map = list(map(w_E_RSO, sizes,a))
+    omega_i_list =[] #initialize w_e_rso list
+    omega_i_map = list(map(w_e_rso, sizes,a))
     omega_i_map = np.array(omega_i_map)
             
     omega_j_map = np.full(shape= len(omega_i_map), fill_value=omega_j_elem,dtype=float)
@@ -915,75 +992,75 @@ def optical_main_background(nube, h_coll, s_min,h_max, piece_of_string, backgrou
     
     no_weights = np.ones(len(weights))
 
-    with open('/Users/luigigisolfi/' + str(nube) + '/CSI_out' + f'/CSI0_optical{piece_of_string}' + '.out', 'w') as fw_CSI0:
+    with open('/Users/luigigisolfi/' + str(cloud_name) + '/csi_out' + f'/csi0_optical{piece_of_string}' + '.out', 'w') as fw_csi0:
         
         for r_in in range(1200 + 6378,2000 + 6378,50):
             
             r_out = r_in + 50 
             
-            f_CSI_shell = fractional_CSI(mass,a,e,inc,weights, r_in, r_out) #all objects weighted fractional CSI on a single shell
-            f_CSI_shell_array = np.array(f_CSI_shell) #make it into array so as to perform operations on it later on
+            f_csi_shell = fractional_csi(mass,a,e,inc,weights, r_in, r_out) #all objects weighted fractional csi on a single shell
+            f_csi_shell_array = np.array(f_csi_shell) #make it into array so as to perform operations on it later on
             
-            f_CSI_shell_no_weights =fractional_CSI(mass,a,e,inc,no_weights, r_in, r_out)#all objects fractional CSI (w=1) on a single shell
-            f_CSI_shell_no_weights_array = np.array(f_CSI_shell_no_weights)
+            f_csi_shell_no_weights =fractional_csi(mass,a,e,inc,no_weights, r_in, r_out)#all objects fractional csi (w=1) on a single shell
+            f_csi_shell_no_weights_array = np.array(f_csi_shell_no_weights)
             
-            total_CSI_shell = np.sum(f_CSI_shell_array)  #computing sum on j of (Post_j-Pre_j) = (Frag_j - Parent_j) on every shell j 
-            total_CSI_shell_no_weights = np.sum(f_CSI_shell_no_weights_array) #same but w = 1
+            total_csi_shell = np.sum(f_csi_shell_array)  #computing sum on j of (Post_j-Pre_j) = (Frag_j - Parent_j) on every shell j 
+            total_csi_shell_no_weights = np.sum(f_csi_shell_no_weights_array) #same but w = 1
 
-            fw_CSI0.writelines(str(total_CSI_shell) + ' ' + str(total_CSI_shell_no_weights) + '\n')   
+            fw_csi0.writelines(str(total_csi_shell) + ' ' + str(total_csi_shell_no_weights) + '\n')   
 
 
 # ## Visualizing the Results
 # 
 # Some functions are written to properly visualize and make sense of the various results we obtained from the simulations:
 # 
-# 1) plotter_CSI
+# 1) plotter_csi
 # 2) plotter_FEI
-# 3) multi_plotter_CSI
+# 3) multi_plotter_csi
 # 4) modulated_FEI
 
-# In[ ]:
+# In[27]:
 
 
-def plotter_CSI(network_type, c):
+def plotter_csi(network_type, c):
     
-    plt.plot(day_list, global_CSI_cloud_only_list, 'o', ms = 3, color = c)
-    plt.title(f'Cumulative Cloud CSI ({network_type}, {size})')
+    plt.plot(day_list, global_csi_cloud_only_list, 'o', ms = 3, color = c)
+    plt.title(f'Cumulative Cloud csi ({network_type}, {size})')
     plt.xlabel('Days From Collision')
-    plt.ylabel('Cumulative Cloud CSI')
+    plt.ylabel('Cumulative Cloud csi')
     plt.tight_layout()
-    plt.savefig('/Users/luigigisolfi/' + str(nube) + f'/figures/{network_type}{piece_of_string}' + '/Cumulative_Cloud_CSI')
+    plt.savefig('/Users/luigigisolfi/' + str(cloud_name) + f'/figures/{network_type}{piece_of_string}' + '/Cumulative_Cloud_csi')
     plt.show()
 
     
-    plt.plot(day_list, global_CSI_cloud_only_list_no_weights, 'o', ms = 3, color = 'blue')
-    plt.title('Cumulative Cloud CSI (w_tr = 1)')
+    plt.plot(day_list, global_csi_cloud_only_list_no_weights, 'o', ms = 3, color = 'blue')
+    plt.title('Cumulative Cloud csi (w_tr = 1)')
     plt.xlabel('Days From Collision')
-    plt.ylabel('Cumulative Cloud CSI')
+    plt.ylabel('Cumulative Cloud csi')
     plt.tight_layout()
-    plt.savefig('/Users/luigigisolfi/' + str(nube) + f'/figures/{network_type}{piece_of_string}' + '/Cumulative_Cloud_CSI_no_track')
+    plt.savefig('/Users/luigigisolfi/' + str(cloud_name) + f'/figures/{network_type}{piece_of_string}' + '/Cumulative_Cloud_csi_no_track')
     plt.show()
 
                                             
-    plt.plot(day_list, global_CSI_list, 'o', ms = 3, color = c)
-    plt.title(f'Cumulative CSI  ({network_type}, {size})')
+    plt.plot(day_list, global_csi_list, 'o', ms = 3, color = c)
+    plt.title(f'Cumulative csi  ({network_type}, {size})')
     plt.xlabel('Days From Collision')
-    plt.ylabel('Cumulative CSI')
+    plt.ylabel('Cumulative csi')
     plt.tight_layout()
-    plt.savefig('/Users/luigigisolfi/' + str(nube) + f'/figures/{network_type}{piece_of_string}' + '/Cumulative_CSI')
+    plt.savefig('/Users/luigigisolfi/' + str(cloud_name) + f'/figures/{network_type}{piece_of_string}' + '/Cumulative_csi')
     plt.show()
 
 
-# In[ ]:
+# In[28]:
 
 
 def plotter_FEI(network_type,c):
     size = piece_of_string.split('_')[1]
-    shells, ratios_1 = np.loadtxt('/Users/luigigisolfi/' + str(nube)+ f'/array_shells_ratios_1_{network_type}' + piece_of_string, unpack= True, usecols = (0,1))
-    shells, ratios_100 = np.loadtxt('/Users/luigigisolfi/' + str(nube)+ f'/array_shells_ratios_100_{network_type}' + piece_of_string, unpack= True, usecols = (0,1))
+    shells, ratios_1 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/array_shells_ratios_1_{network_type}' + piece_of_string, unpack= True, usecols = (0,1))
+    shells, ratios_100 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/array_shells_ratios_100_{network_type}' + piece_of_string, unpack= True, usecols = (0,1))
 
-    post_1, pre_1 =  np.loadtxt('/Users/luigigisolfi/' + str(nube)+ f'/{network_type}_CSI_post_pre_001' + piece_of_string, unpack= True, usecols = (0,1))
-    post_100, pre_100 = np.loadtxt('/Users/luigigisolfi/' + str(nube)+ f'/{network_type}_CSI_post_pre_100' + piece_of_string, unpack= True, usecols = (0,1))
+    post_1, pre_1 =  np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_csi_post_pre_001' + piece_of_string, unpack= True, usecols = (0,1))
+    post_100, pre_100 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_csi_post_pre_100' + piece_of_string, unpack= True, usecols = (0,1))
 
     diff_1 = post_1 - pre_1
     diff_100 = post_100 - pre_100
@@ -996,18 +1073,18 @@ def plotter_FEI(network_type,c):
     plt.legend(loc = 'lower right', prop={'size': 6})
     plt.title(f'Percentage FEI 1 and 100 Days After Collision, ({network_type}, {size})')
     plt.yscale('log')
-    plt.savefig('/Users/luigigisolfi/' + str(nube)+ f'/figures/{network_type}{piece_of_string}' + '/Percentage_FEI_T0_T100')
+    plt.savefig('/Users/luigigisolfi/' + str(cloud_name)+ f'/figures/{network_type}{piece_of_string}' + '/Percentage_FEI_T0_T100')
     plt.show()
 
     plt.plot(shells, diff_1, label = 'Day 1', color = c)
     plt.plot(shells, diff_100, label = 'Day 100', linestyle = '--', color = c)
     plt.axvline(h_coll,0,linestyle = '-.',color = 'silver',label = 'Collision Altitude')
     plt.xlabel('Altitude (km)')
-    plt.ylabel('CSI_post - CSI_pre')
+    plt.ylabel('csi_post - csi_pre')
     plt.legend(loc = 'lower right', prop={'size': 6})
     plt.title(f'FEI 1 and 100 Days After Collision ({network_type}, {size})')
     plt.yscale('log')
-    plt.savefig('/Users/luigigisolfi/' + str(nube)+ f'/figures/{network_type}{piece_of_string}' + '/Diff_FEI_T0_T100')
+    plt.savefig('/Users/luigigisolfi/' + str(cloud_name)+ f'/figures/{network_type}{piece_of_string}' + '/Diff_FEI_T0_T100')
     plt.show()
         
     plt.plot(shells, diff_1*ratios_1, label = 'Day 1', color = c)
@@ -1018,14 +1095,14 @@ def plotter_FEI(network_type,c):
     plt.legend(loc = 'lower right', prop={'size': 6})
     plt.title(f'Modulated Perc FEI ({network_type}, {size})')
     plt.yscale('log')
-    plt.savefig('/Users/luigigisolfi/' + str(nube)+ f'/figures/{network_type}{piece_of_string}' + '/Modulated_FEI_T0_T100')
+    plt.savefig('/Users/luigigisolfi/' + str(cloud_name)+ f'/figures/{network_type}{piece_of_string}' + '/Modulated_FEI_T0_T100')
     plt.show()
 
 
-# In[ ]:
+# In[29]:
 
 
-def multi_plotter_CSI(pieces_of_strings, nube, network_type):
+def multi_plotter_csi(pieces_of_strings, nube, network_type):
 
     colors = ['black', 'grey', 'red']
     if len(nube) == 11:
@@ -1039,69 +1116,69 @@ def multi_plotter_CSI(pieces_of_strings, nube, network_type):
 
     for piece_of_string, c in zip(pieces_of_strings, colors):
         print(piece_of_string, c)
-        day_list, global_CSI_cloud_only_list= np.loadtxt('/Users/luigigisolfi/' + str(nube)+ f'/{network_type}_array_global_CSI_cloud_only' + f'{piece_of_string}', unpack= True, usecols = (0,1))  
-        global_CSI_list = np.loadtxt('/Users/luigigisolfi/' + str(nube)+ f'/{network_type}_array_global_CSI' + f'{piece_of_string}', unpack= True, usecols = 1)  
-        cloud_percentage_contribution = 100*global_CSI_cloud_only_list/global_CSI_list
+        day_list, global_csi_cloud_only_list= np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi_cloud_only' + f'{piece_of_string}', unpack= True, usecols = (0,1))  
+        global_csi_list = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi' + f'{piece_of_string}', unpack= True, usecols = 1)  
+        cloud_percentage_contribution = 100*global_csi_cloud_only_list/global_csi_list
         
         if piece_of_string[0:4] == '_5cm':
-            ax1.plot(day_list, global_CSI_cloud_only_list, 'o', markersize = 3, label = f'{piece_of_string[1:4]} ' + f'{piece_of_string[5:]}' , color = c)
+            ax1.plot(day_list, global_csi_cloud_only_list, 'o', markersize = 3, label = f'{piece_of_string[1:4]} ' + f'{piece_of_string[5:]}' , color = c)
             ax2.plot(day_list, cloud_percentage_contribution, 'o', markersize = 3, label = f'{piece_of_string[1:4]} ' + f'{piece_of_string[5:]}' , color = c)
-            ax3.plot(day_list, global_CSI_list, 'o', markersize = 3, label = f'{piece_of_string[1:4]} ' + f'{piece_of_string[5:]}' , color = c)
+            ax3.plot(day_list, global_csi_list, 'o', markersize = 3, label = f'{piece_of_string[1:4]} ' + f'{piece_of_string[5:]}' , color = c)
 
         else: 
-            ax1.plot(day_list, global_CSI_cloud_only_list, 'o', markersize = 3, label = f'{piece_of_string[1:5]} ' + f'{piece_of_string[6:]}' , color = c)
+            ax1.plot(day_list, global_csi_cloud_only_list, 'o', markersize = 3, label = f'{piece_of_string[1:5]} ' + f'{piece_of_string[6:]}' , color = c)
             ax2.plot(day_list, cloud_percentage_contribution, 'o', markersize = 3, label = f'{piece_of_string[1:5]} ' + f'{piece_of_string[6:]}' , color = c)
-            ax3.plot(day_list, global_CSI_list, 'o', markersize = 3, label = f'{piece_of_string[1:5]} ' + f'{piece_of_string[6:]}' , color = c)
+            ax3.plot(day_list, global_csi_list, 'o', markersize = 3, label = f'{piece_of_string[1:5]} ' + f'{piece_of_string[6:]}' , color = c)
         
-    day_list, global_CSI_cloud_only_list_no_weights = np.loadtxt('/Users/luigigisolfi/' + str(nube)+ f'/{network_type}_array_global_CSI_cloud_only_list_no_weights' + f'{piece_of_string}', unpack= True, usecols = (0,1))  
-    ax1.plot(day_list, global_CSI_cloud_only_list_no_weights, 'o', markersize = 3, label = 'no weights' , color = 'blue')
-    ax1.set(xlabel = 'Time From Collision (Days)', ylabel = 'Cloud CSI')
+    day_list, global_csi_cloud_only_list_no_weights = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi_cloud_only_list_no_weights' + f'{piece_of_string}', unpack= True, usecols = (0,1))  
+    ax1.plot(day_list, global_csi_cloud_only_list_no_weights, 'o', markersize = 3, label = 'no weights' , color = 'blue')
+    ax1.set(xlabel = 'Time From Collision (Days)', ylabel = 'Cloud csi')
     ax1.legend(loc = 'upper right', prop={'size': 6})
-    ax1.set_title("Cloud CSI (on different " + f"{network_type}" + " networks)", fontsize = 'small')
+    ax1.set_title("Cloud csi (on different " + f"{network_type}" + " networks)", fontsize = 'small')
     plt.tight_layout()
     fig1.show()
-    fig1.savefig('/Users/luigigisolfi/' + str(nube)+ f'/figures/{network_type}' + '_Cumulative_Cloud_CSI_comparison',  bbox_inches="tight")
+    fig1.savefig('/Users/luigigisolfi/' + str(cloud_name)+ f'/figures/{network_type}' + '_Cumulative_Cloud_csi_comparison',  bbox_inches="tight")
 
-    ax2.plot(day_list, global_CSI_cloud_only_list_no_weights, 'o', markersize = 3, label = 'no weights' , color = 'blue')
-    ax2.set(xlabel = 'Time From Collision (Days)', ylabel = 'Cloud CSI Contribution to Global CSI (%)')
+    ax2.plot(day_list, global_csi_cloud_only_list_no_weights, 'o', markersize = 3, label = 'no weights' , color = 'blue')
+    ax2.set(xlabel = 'Time From Collision (Days)', ylabel = 'Cloud csi Contribution to Global csi (%)')
     ax2.legend(loc = 'upper right', prop={'size': 6})
-    ax2.set_title("Cloud's Contribution to Global CSI (on different " + f"{network_type}" + " networks)", fontsize = 'small')
+    ax2.set_title("Cloud's Contribution to Global csi (on different " + f"{network_type}" + " networks)", fontsize = 'small')
     plt.tight_layout()
     fig2.show()
-    fig2.savefig('/Users/luigigisolfi/' + str(nube)+ f'/figures/{network_type}' + '_Cumulative_Cloud_CSI_comparison_perc',  bbox_inches="tight")
+    fig2.savefig('/Users/luigigisolfi/' + str(cloud_name)+ f'/figures/{network_type}' + '_Cumulative_Cloud_csi_comparison_perc',  bbox_inches="tight")
 
-    ax3.set(xlabel = 'Time From Collision (Days)', ylabel = 'Global CSI')
+    ax3.set(xlabel = 'Time From Collision (Days)', ylabel = 'Global csi')
     ax3.legend(loc = 'upper right', prop={'size': 6})
-    ax3.set_title("Global CSI (on different " + f"{network_type}" + " networks)", fontsize = 'small')
+    ax3.set_title("Global csi (on different " + f"{network_type}" + " networks)", fontsize = 'small')
     plt.tight_layout()
     fig3.show()
-    fig3.savefig('/Users/luigigisolfi/' + str(nube)+ f'/figures/{network_type}' + '_Global_CSI_comparison',  bbox_inches="tight")
+    fig3.savefig('/Users/luigigisolfi/' + str(cloud_name)+ f'/figures/{network_type}' + '_Global_csi_comparison',  bbox_inches="tight")
 
 
     if network_type == 'radar':
         piece_of_string_0 = '_5cm_1200km'
         piece_of_string_1 = '_15cm_1200km'
-        day_list_0, global_CSI_list_0 = np.loadtxt('/Users/luigigisolfi/' + str(nube)+ f'/{network_type}_array_global_CSI' + f'{piece_of_string_0}', unpack= True, usecols = (0,1))  
-        day_list_1, global_CSI_list_1 = np.loadtxt('/Users/luigigisolfi/' + str(nube)+ f'/{network_type}_array_global_CSI' + f'{piece_of_string_1}', unpack= True, usecols = (0,1))  
-        ratio_performance = global_CSI_list_0/global_CSI_list_1
-        percentage_ratio_performance = (1 - global_CSI_list_0/global_CSI_list_1)*100
+        day_list_0, global_csi_list_0 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi' + f'{piece_of_string_0}', unpack= True, usecols = (0,1))  
+        day_list_1, global_csi_list_1 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi' + f'{piece_of_string_1}', unpack= True, usecols = (0,1))  
+        ratio_performance = global_csi_list_0/global_csi_list_1
+        percentage_ratio_performance = (1 - global_csi_list_0/global_csi_list_1)*100
 
-        print(global_CSI_list_0)
-        print(global_CSI_list_1)
+        print(global_csi_list_0)
+        print(global_csi_list_1)
         print(ratio_performance)
 
         fig, axs = plt.subplots(3, 1)
         
-        axs[0].plot(day_list_0, global_CSI_list_1,'o', markersize = 3)
+        axs[0].plot(day_list_0, global_csi_list_1,'o', markersize = 3)
         axs[0].set_title(f'Radar 15 cm, Coll. Altitude = {h_coll} km', fontsize = 'small')
-        axs[1].plot(day_list_0, global_CSI_list_0, 'o', markersize = 3)
+        axs[1].plot(day_list_0, global_csi_list_0, 'o', markersize = 3)
         axs[1].set_title(f'Radar 5 cm, Coll. Altitude = {h_coll} km',  fontsize = 'small')
         axs[2].plot(day_list_0, percentage_ratio_performance, 'o', markersize = 3)
         axs[2].set_title('Performance Comparison', fontsize = 'small')
 
 
-        axs[0].set(xlabel='Time From Collision (Days)', ylabel='Global CSI')
-        axs[1].set(xlabel='Time From Collision (Days)', ylabel='Global CSI')
+        axs[0].set(xlabel='Time From Collision (Days)', ylabel='Global csi')
+        axs[1].set(xlabel='Time From Collision (Days)', ylabel='Global csi')
         axs[2].set(xlabel='Time From Collision (Days)', ylabel='Risk Reduction (%)')
 
         # Hide x labels and tick labels for top plots and y ticks for right plots.
@@ -1110,31 +1187,31 @@ def multi_plotter_CSI(pieces_of_strings, nube, network_type):
 
         plt.tight_layout()
         plt.ticklabel_format(useOffset=False)
-        fig.savefig('/Users/luigigisolfi/' + str(nube)+ f'/figures/{network_type}' + '_Performance_Ratios',  bbox_inches="tight")
+        fig.savefig('/Users/luigigisolfi/' + str(cloud_name)+ f'/figures/{network_type}' + '_Performance_Ratios',  bbox_inches="tight")
 
     elif network_type == 'optical':
         piece_of_string_0 = '_5cm_2000km'
         piece_of_string_1 = '_20cm_2000km'
-        day_list_0, global_CSI_list_0 = np.loadtxt('/Users/luigigisolfi/' + str(nube)+ f'/{network_type}_array_global_CSI' + f'{piece_of_string_0}', unpack= True, usecols = (0,1))  
-        day_list_1, global_CSI_list_1 = np.loadtxt('/Users/luigigisolfi/' + str(nube)+ f'/{network_type}_array_global_CSI' + f'{piece_of_string_1}', unpack= True, usecols = (0,1))  
-        ratio_performance = global_CSI_list_0/global_CSI_list_1
-        percentage_ratio_performance = (1 - global_CSI_list_0/global_CSI_list_1)*100
+        day_list_0, global_csi_list_0 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi' + f'{piece_of_string_0}', unpack= True, usecols = (0,1))  
+        day_list_1, global_csi_list_1 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi' + f'{piece_of_string_1}', unpack= True, usecols = (0,1))  
+        ratio_performance = global_csi_list_0/global_csi_list_1
+        percentage_ratio_performance = (1 - global_csi_list_0/global_csi_list_1)*100
 
-        print(global_CSI_list_0)
-        print(global_CSI_list_1)
+        print(global_csi_list_0)
+        print(global_csi_list_1)
         print(ratio_performance)
 
         fig, axs = plt.subplots(3, 1)
-        axs[0].plot(day_list_0, global_CSI_list_1,'o', markersize = 3)
+        axs[0].plot(day_list_0, global_csi_list_1,'o', markersize = 3)
         axs[0].set_title(f'Optical 20 cm, Coll. Altitude = {h_coll} km', fontsize = 'small')
-        axs[1].plot(day_list_0, global_CSI_list_0, 'o', markersize = 3)
+        axs[1].plot(day_list_0, global_csi_list_0, 'o', markersize = 3)
         axs[1].set_title(f'Optical 5 cm, Coll. Altitude = {h_coll} km',  fontsize = 'small')
         axs[2].plot(day_list_0, percentage_ratio_performance, 'o', markersize = 3)
         axs[2].set_title('Performance Comparison', fontsize = 'small')
 
 
-        axs[0].set(xlabel='Time From Collision (Days)', ylabel='Global CSI')
-        axs[1].set(xlabel='Time From Collision (Days)', ylabel='Global CSI')
+        axs[0].set(xlabel='Time From Collision (Days)', ylabel='Global csi')
+        axs[1].set(xlabel='Time From Collision (Days)', ylabel='Global csi')
         axs[2].set(xlabel='Time From Collision (Days)', ylabel='Risk Reduction (%)')
 
         # Hide x labels and tick labels for top plots and y ticks for right plots.
@@ -1143,30 +1220,30 @@ def multi_plotter_CSI(pieces_of_strings, nube, network_type):
 
         plt.ticklabel_format(useOffset=False)
         plt.tight_layout()
-        fig.savefig('/Users/luigigisolfi/' + str(nube)+ f'/figures/{network_type}' + '_Performance_Ratios',  bbox_inches="tight")
+        fig.savefig('/Users/luigigisolfi/' + str(cloud_name)+ f'/figures/{network_type}' + '_Performance_Ratios',  bbox_inches="tight")
 
 
-# In[ ]:
+# In[30]:
 
 
 def modulated_FEI(pieces_of_strings, nube, h_coll, network_type):
 
     for piece_of_string in pieces_of_strings:
          size = piece_of_string.split('_')[1]
-         shells, ratios_1 = np.loadtxt('/Users/luigigisolfi/' + str(nube)+ f'/array_shells_ratios_1_{network_type}' + piece_of_string, unpack= True, usecols = (0,1))
-         shells, ratios_100 = np.loadtxt('/Users/luigigisolfi/' + str(nube)+ f'/array_shells_ratios_100_{network_type}' + piece_of_string, unpack= True, usecols = (0,1))
-         CSI_post_100_base, CSI_pre_100_base = np.loadtxt('/Users/luigigisolfi/' + nube + f'/{network_type}_CSI_post_pre_' + '100' + f'{piece_of_string}', unpack = True, usecols = (0,1))
-         CSI_post_1_base, CSI_pre_1_base = np.loadtxt('/Users/luigigisolfi/' + nube + f'/{network_type}_CSI_post_pre_' + '001' + f'{piece_of_string}', unpack = True, usecols = (0,1))
+         shells, ratios_1 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/array_shells_ratios_1_{network_type}' + piece_of_string, unpack= True, usecols = (0,1))
+         shells, ratios_100 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/array_shells_ratios_100_{network_type}' + piece_of_string, unpack= True, usecols = (0,1))
+         csi_post_100_base, csi_pre_100_base = np.loadtxt('/Users/luigigisolfi/' + nube + f'/{network_type}_csi_post_pre_' + '100' + f'{piece_of_string}', unpack = True, usecols = (0,1))
+         csi_post_1_base, csi_pre_1_base = np.loadtxt('/Users/luigigisolfi/' + nube + f'/{network_type}_csi_post_pre_' + '001' + f'{piece_of_string}', unpack = True, usecols = (0,1))
          
-         plt.plot(shells, ratios_1*(CSI_post_1_base-CSI_pre_1_base), label = 'Day 1', color = 'grey')
-         plt.plot(shells, ratios_100*(CSI_post_1_base-CSI_pre_1_base), linestyle = '--', label = 'Day 100', color = 'grey')
+         plt.plot(shells, ratios_1*(csi_post_1_base-csi_pre_1_base), label = 'Day 1', color = 'grey')
+         plt.plot(shells, ratios_100*(csi_post_1_base-csi_pre_1_base), linestyle = '--', label = 'Day 100', color = 'grey')
          plt.axvline(h_coll,0,linestyle = '-.',color = 'silver',label = 'Collision Altitude')
          plt.title(f'Modulated Perc FEI ({network_type}, {size})')
          plt.xlabel('Altitude (km)')
          plt.ylabel('Modulated Perc FEI')
          plt.legend()
          plt.tight_layout
-         plt.savefig('/Users/luigigisolfi/' + str(nube)+ f'/figures/{network_type}{piece_of_string}' + '/Modulated_FEI_T0_T100', bbox_inches = 'tight')
+         plt.savefig('/Users/luigigisolfi/' + str(cloud_name)+ f'/figures/{network_type}{piece_of_string}' + '/Modulated_FEI_T0_T100', bbox_inches = 'tight')
          plt.show()
 
 # def multi_plotter_FEI(pieces_of_strings, nube, h_coll, network_type):
@@ -1174,8 +1251,8 @@ def modulated_FEI(pieces_of_strings, nube, h_coll, network_type):
 #     colors = ['black', 'grey', 'red']
 #     for piece_of_string, c in zip(pieces_of_strings, colors):
 #         print(piece_of_string, c)
-#         shells, ratios_1 = np.loadtxt('/Users/luigigisolfi/' + str(nube)+ f'/array_shells_ratios_1_{network_type}' + piece_of_string, unpack= True, usecols = (0,1))
-#         shells, ratios_100 = np.loadtxt('/Users/luigigisolfi/' + str(nube)+ f'/array_shells_ratios_100_{network_type}' + piece_of_string, unpack= True, usecols = (0,1))
+#         shells, ratios_1 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/array_shells_ratios_1_{network_type}' + piece_of_string, unpack= True, usecols = (0,1))
+#         shells, ratios_100 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/array_shells_ratios_100_{network_type}' + piece_of_string, unpack= True, usecols = (0,1))
 #         plt.plot(shells, ratios_1, label = f'{piece_of_string[1:5]} ' + f'{piece_of_string[6:]}' , color = c)
 #         plt.plot(shells, ratios_100, linestyle = '--', color = c)
         
@@ -1185,46 +1262,46 @@ def modulated_FEI(pieces_of_strings, nube, h_coll, network_type):
 #     plt.legend(loc = 'lower right', prop={'size': 6})
 #     plt.title('Percentage FEI 1 and 100 Days After Collision (different ' + f'{network_type}' + ' networks)')
 #     plt.yscale('log')
-#     plt.savefig('/Users/luigigisolfi/' + str(nube)+ f'/figures/{network_type}' + '_Percentage_FEI_T0_T100_multi_plot')
+#     plt.savefig('/Users/luigigisolfi/' + str(cloud_name)+ f'/figures/{network_type}' + '_Percentage_FEI_T0_T100_multi_plot')
 #     plt.show()
 
     # if network_type == 'optical':
-    #     CSI_post_100_base, CSI_pre_100_base = np.loadtxt('/Users/luigigisolfi/' + nube + f'/{network_type}_CSI_post_pre_' + '100' + '_20cm_2000km', unpack = True, usecols = (0,1))
-    #     CSI_post_1_base, CSI_pre_1_base = np.loadtxt('/Users/luigigisolfi/' + 'nube_1800_km' + f'/{network_type}_CSI_post_pre_' + '001' + '_20cm_2000km', unpack = True, usecols = (0,1))
-    #     days, CSI_cloud_base = np.loadtxt('/Users/luigigisolfi/' + str(nube)+ f'/{network_type}_array_global_CSI_cloud_only' + '_20cm_2000km', unpack= True, usecols = (0,1))
+    #     csi_post_100_base, csi_pre_100_base = np.loadtxt('/Users/luigigisolfi/' + nube + f'/{network_type}_csi_post_pre_' + '100' + '_20cm_2000km', unpack = True, usecols = (0,1))
+    #     csi_post_1_base, csi_pre_1_base = np.loadtxt('/Users/luigigisolfi/' + 'nube_1800_km' + f'/{network_type}_csi_post_pre_' + '001' + '_20cm_2000km', unpack = True, usecols = (0,1))
+    #     days, csi_cloud_base = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi_cloud_only' + '_20cm_2000km', unpack= True, usecols = (0,1))
     
     # elif network_type == 'radar':
-    #     CSI_post_100_base, CSI_pre_100_base = np.loadtxt('/Users/luigigisolfi/' + nube + f'/{network_type}_CSI_post_pre_' + '100' + '_15cm_1200km', unpack = True, usecols = (0,1))
-    #     CSI_post_1_base, CSI_pre_1_base = np.loadtxt('/Users/luigigisolfi/' + nube + f'/{network_type}_CSI_post_pre_' + '001' + '_15cm_1200km', unpack = True, usecols = (0,1))
-    #     days, CSI_cloud_base = np.loadtxt('/Users/luigigisolfi/' + str(nube)+ f'/{network_type}_array_global_CSI_cloud_only' + '_15cm_1200km', unpack= True, usecols = (0,1))
+    #     csi_post_100_base, csi_pre_100_base = np.loadtxt('/Users/luigigisolfi/' + nube + f'/{network_type}_csi_post_pre_' + '100' + '_15cm_1200km', unpack = True, usecols = (0,1))
+    #     csi_post_1_base, csi_pre_1_base = np.loadtxt('/Users/luigigisolfi/' + nube + f'/{network_type}_csi_post_pre_' + '001' + '_15cm_1200km', unpack = True, usecols = (0,1))
+    #     days, csi_cloud_base = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi_cloud_only' + '_15cm_1200km', unpack= True, usecols = (0,1))
     
     # pos_100_base = np.where(days == 100)
     # pos_1_base = np.where(days == 1)
-    # CSI_cloud_100_base = CSI_cloud_base[pos_100_base]
-    # CSI_cloud_1_base = CSI_cloud_base[pos_1_base]
-    # CSI_parent_pre_100 = CSI_pre_100_base + CSI_cloud_100_base - CSI_post_100_base
-    # print(CSI_parent_pre_100, ' at 100')
-    # CSI_parent_pre_1 = CSI_pre_1_base + CSI_cloud_1_base - CSI_post_1_base
-    # print(CSI_parent_pre_1, ' at 1')
+    # csi_cloud_100_base = csi_cloud_base[pos_100_base]
+    # csi_cloud_1_base = csi_cloud_base[pos_1_base]
+    # csi_parent_pre_100 = csi_pre_100_base + csi_cloud_100_base - csi_post_100_base
+    # print(csi_parent_pre_100, ' at 100')
+    # csi_parent_pre_1 = csi_pre_1_base + csi_cloud_1_base - csi_post_1_base
+    # print(csi_parent_pre_1, ' at 1')
 
     # for piece_of_string, c in zip(pieces_of_strings, colors):
-    #     days, CSI_cloud = np.loadtxt('/Users/luigigisolfi/' + str(nube)+ f'/{network_type}_array_global_CSI_cloud_only' + piece_of_string, unpack= True, usecols = (0,1))
+    #     days, csi_cloud = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi_cloud_only' + piece_of_string, unpack= True, usecols = (0,1))
     #     pos_100 = np.where(days == 100)
     #     pos_1 = np.where(days == 1)
-    #     CSI_cloud_100 = CSI_cloud[pos_100]
-    #     CSI_cloud_1 = CSI_cloud[pos_1]
-    #     CSI_post_100 = CSI_pre_100_base + CSI_cloud_100 - CSI_parent_pre_100
-    #     CSI_post_1 = CSI_pre_1_base + CSI_cloud_1 - CSI_parent_pre_1
+    #     csi_cloud_100 = csi_cloud[pos_100]
+    #     csi_cloud_1 = csi_cloud[pos_1]
+    #     csi_post_100 = csi_pre_100_base + csi_cloud_100 - csi_parent_pre_100
+    #     csi_post_1 = csi_pre_1_base + csi_cloud_1 - csi_parent_pre_1
 
-    #     print('CSI parent 100 is ', CSI_parent_pre_100)
-    #     print('CSI parent 1 is ', CSI_parent_pre_1)
-    #     print(f'{piece_of_string} has CSI_post_100 as ', CSI_post_100)
-    #     print(f'{piece_of_string} has CSI_cloud_100 as ', CSI_cloud_100)
-    #     print(f'{piece_of_string} has CSI_post_1 as ', CSI_post_1)
-    #     print(f'{piece_of_string} has CSI_cloud_1 as ', CSI_cloud_1)
+    #     print('csi parent 100 is ', csi_parent_pre_100)
+    #     print('csi parent 1 is ', csi_parent_pre_1)
+    #     print(f'{piece_of_string} has csi_post_100 as ', csi_post_100)
+    #     print(f'{piece_of_string} has csi_cloud_100 as ', csi_cloud_100)
+    #     print(f'{piece_of_string} has csi_post_1 as ', csi_post_1)
+    #     print(f'{piece_of_string} has csi_cloud_1 as ', csi_cloud_1)
         
-    #     ratios_100_base = (CSI_post_100 - CSI_pre_100_base)/CSI_pre_100_base
-    #     ratios_1_base = (CSI_post_1 - CSI_pre_1_base)/CSI_pre_1_base
+    #     ratios_100_base = (csi_post_100 - csi_pre_100_base)/csi_pre_100_base
+    #     ratios_1_base = (csi_post_1 - csi_pre_1_base)/csi_pre_1_base
     #     print(piece_of_string, c)
     #     plt.plot(shells, ratios_1_base, label = f'{piece_of_string[1:5]} ' + f'{piece_of_string[6:]}' , color = c)
     #     plt.plot(shells, ratios_100_base, linestyle = '--', color = c)
@@ -1235,13 +1312,13 @@ def modulated_FEI(pieces_of_strings, nube, h_coll, network_type):
     # plt.legend(loc = 'lower right', prop={'size': 6})
     # plt.title('Percentage FEI 1 and 100 Days After Collision (different ' + f'{network_type}' + ' networks)')
     # plt.yscale('log')
-    # plt.savefig('/Users/luigigisolfi/' + str(nube)+ f'/figures/{network_type}' + '_Percentage_FEI_T0_T100_multi_plot_base')
+    # plt.savefig('/Users/luigigisolfi/' + str(cloud_name)+ f'/figures/{network_type}' + '_Percentage_FEI_T0_T100_multi_plot_base')
     # plt.show()
 
 
 # ## CUMULATIVE INDEX COMPUTATION AS A BONUS
 
-# In[4]:
+# In[33]:
 
 
 if __name__ == '__main__':
@@ -1280,23 +1357,25 @@ if __name__ == '__main__':
         elif piece_of_string.split('_')[1] == '15cm':
             c = 'black'
             print(f'{c}')
-        radar_main_background(nube, h_coll, s_min,h_max, piece_of_string, background_pop)
-        day_list, global_CSI_cloud_only_list, global_CSI_cloud_only_list_no_weights, global_CSI_list, global_CSI_list_no_weights, ratios_list = radar_main(nube, h_coll, s_min,h_max, piece_of_string)
+        radar_background(nube, h_coll, s_min,h_max, piece_of_string, background_pop)
+        day_list, global_csi_cloud_only_list, global_csi_cloud_only_list_no_weights, global_csi_list, global_csi_list_no_weights, ratios_list = radar(nube, h_coll, s_min,h_max, piece_of_string)
 
-        CUMULATIVE_INDEX = np.sum(global_CSI_cloud_only_list)
-        if os.path.isdir(f'/Users/luigigisolfi/{str(nube)}/CUMULATIVE_INDEX_RADAR/'):
+        CUMULATIVE_INDEX = np.sum(global_csi_cloud_only_list)
+        CUMULATIVE_INDEX_NO_WEIGHTS = np.sum(global_csi_cloud_only_list_no_weights)
+        if os.path.isdir(f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_RADAR/'):
             print('CUMULATIVE_INDEX directory already exists.\n')
             
         else:
-            os.mkdir(f'/Users/luigigisolfi/{str(nube)}/CUMULATIVE_INDEX_RADAR/')
+            os.mkdir(f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_RADAR/')
             print('Created CUMULATIVE_INDEX directory.\n')
-        with open(f'/Users/luigigisolfi/{str(nube)}/CUMULATIVE_INDEX_RADAR/cumulative_index_{piece_of_string}.txt', 'w') as cumulative_index:
-                cumulative_index.write(f'CUMULATIVE INDEX: {CUMULATIVE_INDEX}')
+        with open(f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_RADAR/cumulative_index_{piece_of_string}.txt', 'w') as cumulative_index:
+                cumulative_index.write(f'CUMULATIVE INDEX: {CUMULATIVE_INDEX}\n')
+                cumulative_index.write(f'CUMULATIVE INDEX_NO_WEIGHTS: {CUMULATIVE_INDEX_NO_WEIGHTS}\n')
                 cumulative_index.close()
             
 
         plotter_FEI(network_type, c) 
-        plotter_CSI(network_type, c)     
+        plotter_csi(network_type, c)     
     elif network_type == 'optical':
 
         if piece_of_string.split('_')[1] == '5cm':
@@ -1309,22 +1388,24 @@ if __name__ == '__main__':
             c = 'black'
             print(f'{c}')
         optical_main_background(nube, h_coll, s_min,h_max, piece_of_string,background_pop)
-        day_list, global_CSI_cloud_only_list, global_CSI_cloud_only_list_no_weights, global_CSI_list, global_CSI_list_no_weights, ratios_list = optical_main(nube, h_coll, s_min,h_max, piece_of_string)
+        day_list, global_csi_cloud_only_list, global_csi_cloud_only_list_no_weights, global_csi_list, global_csi_list_no_weights, ratios_list = optical_main(nube, h_coll, s_min,h_max, piece_of_string)
 
-        CUMULATIVE_INDEX = np.sum(global_CSI_cloud_only_list)
-        if os.path.isdir(f'/Users/luigigisolfi/{str(nube)}/CUMULATIVE_INDEX_OPTICAL/'):
+        CUMULATIVE_INDEX = np.sum(global_csi_cloud_only_list)
+        CUMULATIVE_INDEX_NO_WEIGHTS = np.sum(global_csi_cloud_only_list_no_weights)
+        if os.path.isdir(f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_OPTICAL/'):
             print('CUMULATIVE_INDEX directory already exists.\n')
             
         else:
-            os.mkdir(f'/Users/luigigisolfi/{str(nube)}/CUMULATIVE_INDEX_OPTICAL/')
+            os.mkdir(f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_OPTICAL/')
             print('Created CUMULATIVE_INDEX directory.\n')
-        with open(f'/Users/luigigisolfi/{str(nube)}/CUMULATIVE_INDEX_OPTICAL/cumulative_index_{piece_of_string}.txt', 'w') as cumulative_index:
+        with open(f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_OPTICAL/cumulative_index_{piece_of_string}.txt', 'w') as cumulative_index:
                 cumulative_index.write(f'CUMULATIVE INDEX: {CUMULATIVE_INDEX}')
+                cumulative_index.write(f'CUMULATIVE INDEX_NO_WEIGHTS: {CUMULATIVE_INDEX_NO_WEIGHTS}\n')
                 cumulative_index.close()
             
 
         plotter_FEI(network_type, c)  
-        plotter_CSI(network_type, c)
+        plotter_csi(network_type, c)
     else:
         print('Not a valid network type. Aborting...')
         exit()
@@ -1333,51 +1414,226 @@ if __name__ == '__main__':
 # In[ ]:
 
 
-pip install -U kaleido
+if __name__ == '__main__':
+        
+    nube = input('Cloud File Name? (e.g. cloud_xxx.fla)')
+    
+    if len(nube) == 11:
+        h_coll = float(nube[5:8])
+    elif len(nube) == 12:
+        h_coll = float(nube[5:9])
+    
+    elevation = float(input('Please, input the elevation of your telescope (degrees): '))
+    elevation = elevation*np.pi/180 #deg to rad
+    
+    if h_coll >= 1200: 
+        network_type = 'optical'
+    elif h_coll<1200:
+        network_type = 'radar'
 
+    h_max = float(input('Please, input the maximum observable height (Km): '))
+    s_min = float(input('Please, input the minimum observable size (cm) at ' + str(h_max) + ': '))
 
-# In[43]:
+    background_pop = input('Please, insert the background population file path: \n')
+    piece_of_string = '_' + str(round(s_min)) + 'cm_' + str(round(h_max)) + 'km'
+    size = piece_of_string.split('_')[1]
+    print('size... :',size)
 
+    if network_type == 'radar':
 
-csi_cumulative_list = []
-capability_list = []
-nube = 'nube_450_km'
-for file in os.listdir(f'/Users/luigigisolfi/{str(nube)}/CUMULATIVE_INDEX_RADAR/'):
-    if file == '.ipynb_checkpoints' or '30' in file:
-        continue
-    print(file)
-    if len(file.split('_')[3]) == 4:
-        capability = float(file.split('_')[3][:2])
-        print(capability)
+        if piece_of_string.split('_')[1] == '5cm':
+            c = 'red'
+            print(f'{c}')
+        elif piece_of_string.split('_')[1] == '10cm':
+            c = 'grey'
+            print(f'{c}')
+        elif piece_of_string.split('_')[1] == '15cm':
+            c = 'black'
+            print(f'{c}')
+        radar_background(nube, h_coll, s_min,h_max, piece_of_string, background_pop)
+        day_list, global_csi_cloud_only_list, global_csi_cloud_only_list_no_weights, global_csi_list, global_csi_list_no_weights, ratios_list = radar(nube, h_coll, s_min,h_max, piece_of_string)
+
+        CUMULATIVE_INDEX = np.sum(global_csi_cloud_only_list)
+        CUMULATIVE_INDEX_NO_WEIGHTS = np.sum(global_csi_cloud_only_list_no_weights)
+        if os.path.isdir(f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_RADAR/'):
+            print('CUMULATIVE_INDEX directory already exists.\n')
+            
+        else:
+            os.mkdir(f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_RADAR/')
+            print('Created CUMULATIVE_INDEX directory.\n')
+        with open(f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_RADAR/cumulative_index_{piece_of_string}.txt', 'w') as cumulative_index:
+                cumulative_index.write(f'CUMULATIVE INDEX: {CUMULATIVE_INDEX}\n')
+                cumulative_index.write(f'CUMULATIVE INDEX_NO_WEIGHTS: {CUMULATIVE_INDEX_NO_WEIGHTS}\n')
+                cumulative_index.close()
+            
+
+        plotter_FEI(network_type, c) 
+        plotter_csi(network_type, c)     
+    elif network_type == 'optical':
+
+        if piece_of_string.split('_')[1] == '5cm':
+            c = 'red'
+            print(f'{c}')
+        elif piece_of_string.split('_')[1] == '15cm':
+            c = 'grey'
+            print(f'{c}')
+        elif piece_of_string.split('_')[1] == '20cm':
+            c = 'black'
+            print(f'{c}')
+        optical_main_background(nube, h_coll, s_min,h_max, piece_of_string,background_pop)
+        day_list, global_csi_cloud_only_list, global_csi_cloud_only_list_no_weights, global_csi_list, global_csi_list_no_weights, ratios_list = optical_main(nube, h_coll, s_min,h_max, piece_of_string)
+
+        CUMULATIVE_INDEX = np.sum(global_csi_cloud_only_list)
+        CUMULATIVE_INDEX_no_weights = np.sum(global_csi_cloud_only_list)
+        if os.path.isdir(f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_OPTICAL/'):
+            print('CUMULATIVE_INDEX directory already exists.\n')
+            
+        else:
+            os.mkdir(f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_OPTICAL/')
+            print('Created CUMULATIVE_INDEX directory.\n')
+        with open(f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_OPTICAL/cumulative_index_{piece_of_string}.txt', 'w') as cumulative_index:
+                cumulative_index.write(f'CUMULATIVE INDEX: {CUMULATIVE_INDEX}')
+                cumulative_index.close()
+            
+
+        plotter_FEI(network_type, c)  
+        plotter_csi(network_type, c)
     else:
-        capability = float(file.split('_')[3][:1])
-        print(capability)        
-    csi_cumulative = np.loadtxt(f'/Users/luigigisolfi/{str(nube)}/CUMULATIVE_INDEX_RADAR/{file}', unpack = True, usecols = 2)
-    csi_cumulative_list.append(csi_cumulative)
-    capability_list.append(capability)
-
-print(csi_cumulative_list)
-plt.axhline(1, color = 'r', linestyle = '--', alpha = 0.5)
-plt.axvline(15, color = 'r', linestyle = '--', alpha = 0.5)
-plt.scatter(np.sort(capability_list), np.sort(csi_cumulative_list)/np.sort(csi_cumulative_list)[2])
-plt.title('Cumulative Cloud CSI Over 100 Days (Normalized)')
-plt.xlabel('Minimum Detectable Size at 1200 km (cm)')
-plt.ylabel('Cumulative Cloud CSI')
-plt.savefig(f'/Users/luigigisolfi/{str(nube)}/figures/Cumulative_CSI_Radar_{str(nube)}')
+        print('Not a valid network type. Aborting...')
+        exit()
 
 
-# In[44]:
+# In[ ]:
+
+
+nubi = ['nube_450_km', 'nube_800_km']
+for nube in nubi:
+    csi_cumulative_list = []
+    csi_cumulative_no_weights_list = []
+    capability_list = []    
+    if os.path.exists(f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_OPTICAL/'):
+        dir_path = f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_OPTICAL/'
+    else:
+        dir_path = f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_RADAR/'
+    for file in os.listdir(dir_path):
+        if file == '.ipynb_checkpoints' or '30' in file:
+            continue
+        print(file)
+        if len(file.split('_')[3]) == 4:
+            capability = float(file.split('_')[3][:2])
+            print(capability)
+        else:
+            capability = float(file.split('_')[3][:1])
+            print(capability)      
+
+        csi_cumulative_both = np.loadtxt(f'{dir_path}/{file}', unpack=True, usecols=2)
+        csi_cumulative = csi_cumulative_both[0]
+        csi_cumulative_no_weights = csi_cumulative_both[1]
+        csi_cumulative_list.append(csi_cumulative)
+        csi_cumulative_no_weights_list.append(csi_cumulative_no_weights)
+        capability_list.append(capability)
+
+    print(csi_cumulative_list)
+
+    # Normalize the values
+    sorted_capabilities = np.sort(capability_list)
+    normalized_csi = np.sort(csi_cumulative_list)/1.209707813667907
+
+    # Create scatter plot
+    plt.scatter(sorted_capabilities, normalized_csi, alpha=1)
+
+    # Add plot labels and title
+    plt.title('Cumulative Cloud csi Over 100 Days (Normalized)')
+    plt.xlabel(f'Minimum Detectable Size at {nube.split("_")[1]} km (cm)')
+    plt.ylabel('Cumulative Cloud csi')
+    
+    # Save the plot
+    plt.savefig(f'/Users/luigigisolfi/{str(cloud_name)}/figures/Cumulative_csi_Results')
+    plt.show()
+
+
+# In[139]:
+
+
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+
+nubi = ['nube_1800_km', 'nube_1200_km']
+
+# Initialize the plot
+plt.figure(figsize=(10, 6))
+
+for nube in nubi:
+    print(nube)
+    csi_cumulative_list = []
+    csi_cumulative_no_weights_list = []
+    capability_list = []    
+    if os.path.exists(f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_OPTICAL/'):
+        dir_path = f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_OPTICAL/'
+    else:
+        dir_path = f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_RADAR/'
+    for file in os.listdir(dir_path):
+        if file == '.ipynb_checkpoints' or '30' in file:
+            continue
+        print(file)
+        if len(file.split('_')[3]) == 4:
+            capability = float(file.split('_')[3][:2])
+            print(capability)
+        else:
+            capability = float(file.split('_')[3][:1])
+            print(capability)      
+
+        csi_cumulative = np.loadtxt(f'{dir_path}/{file}', unpack=True, usecols=2)
+        csi_cumulative_list.append(csi_cumulative)
+        capability_list.append(capability)
+
+    # Normalize the values
+    sorted_capabilities =np.sort(capability_list)
+    normalized_csi = np.sort(csi_cumulative_list) /  0.27879089758704834 #normalization value for csi cloud no weights is taken from 1800 km (optical, value =  0.27879089758704834) or 800 km (radar, value = 1.209707813667907)
+
+    print(sorted_capabilities)
+    print(normalized_csi)
+    #normalized_csi = [row[0] for row in normalized_csi]
+
+
+    print(normalized_csi)
+    # Create scatter plot for this dataset
+    plt.scatter(
+        sorted_capabilities,
+        normalized_csi,
+        alpha=1,
+        s = 40,
+        label=f'$h_f$ = {nube.split("_")[1]} km'
+    )
+
+    # Optionally add text annotations (offset to the right)
+    #for x, y in zip(sorted_capabilities, normalized_csi):
+    #    plt.text(x + 0.1, y + 0.001, f'{y:.4f}', fontsize=8, ha='right', va='bottom')
+
+# Add plot labels, legend, and title
+plt.title('Cumulative Cloud csi Over 100 Days (Normalized)')
+plt.xlabel('Minimum Detectable Size (cm)')
+plt.ylabel('Cumulative Cloud csi')
+plt.legend()
+
+# Save and show the plot
+plt.savefig(f'/Users/luigigisolfi/{str(cloud_name)}/figures/Cumulative_csi_Results_Combined.png')
+plt.show()
+
+
+# In[ ]:
 
 
 import plotly.express as px
 
-print(csi_cumulative_list/csi_cumulative_list[2])
+print(np.array(csi_cumulative_list)/np.array(csi_cumulative_no_weights_list))
 str_xlabel = [str(round(n)) + ' cm' for n in np.sort(capability_list)]
-fig = px.imshow([np.sort(csi_cumulative_list)/np.sort(csi_cumulative_list)[2]], color_continuous_scale=[(0, "blue"), (0.5, "white"), (1, "red")], color_continuous_midpoint=1)
+fig = px.imshow(np.sort(csi_cumulative_list)/csi_cumulative_no_weights_list[2], color_continuous_scale=[(0, "blue"), (0.5, "white"), (1, "red")], color_continuous_midpoint=1)
 fig.update_xaxes(showticklabels=True).update_yaxes(showticklabels=False)
 fig.update_layout(
     title={
-        'text': 'Cumulative Cloud CSI over 100 Days (Normalized)',            # Set your desired title text
+        'text': 'Cumulative Cloud csi over 100 Days (Normalized)',            # Set your desired title text
         'y': 0.9,                           # Vertical position (y-axis) of title (between 0 and 1)
         'x': 0.5,                           # Horizontal position of the title
         'xanchor': 'center',                # Anchor the title text horizontally
@@ -1392,10 +1648,10 @@ fig.update_layout(
 )
 
 fig.show()
-fig.write_image(f'/Users/luigigisolfi/{str(nube)}/figures/Cumulative_Color_Bar_{str(nube)}.png')
+fig.write_image(f'/Users/luigigisolfi/{str(cloud_name)}/figures/Cumulative_Color_Bar_{str(cloud_name)}.png')
 
 
-# In[100]:
+# In[ ]:
 
 
 import matplotlib.pyplot as plt
@@ -1428,7 +1684,7 @@ ax2.set_xlim(extent[0], extent[1])
 
 # Add colorbar
 cbar = plt.colorbar(im, ax=ax2, orientation='horizontal', pad=0.2)
-cbar.set_label('Cumulative Cloud CSI Value (Normalized)')
+cbar.set_label('Cumulative Cloud csi Value (Normalized)')
 
 ax.scatter(x, y, label='Original Data')
 ax.plot(x_new, y_interpolated, label='Interpolated Data', color='orange')
@@ -1441,7 +1697,7 @@ plt.tight_layout()
 plt.show()
 
 
-# In[15]:
+# In[ ]:
 
 
 
