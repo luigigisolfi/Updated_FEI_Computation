@@ -267,7 +267,7 @@ class ComputeFEI:
 
     def w_radar(self, s_fragment,a_fragment):
 
-        h_fragment = a_fragment - r_e
+        h_fragment = a_fragment - self.r_e
         sigma_fragment = (np.pi/4)*s_fragment**2
         rho_fragment_radar = self.h_to_rho(h_fragment)
 
@@ -506,6 +506,7 @@ class ComputeFEI:
         background_filename = 'csi0_radar' + piece_of_string + '.out'
         figures_folder_path = os.path.join(clouds_folder_path, 'figures')
         weights_folder_path = os.path.join(clouds_folder_path, 'weights')
+        data_folder_path = os.path.join(cloud_folder_path, 'data')
 
 
         csi_background, csi_background_no_weights = np.loadtxt(os.path.join(csi_background_folder, background_filename), unpack = True, usecols = (0,1))
@@ -518,9 +519,9 @@ class ComputeFEI:
         if not os.path.isdir(weights_folder_path + '/radar' + piece_of_string):
             os.makedirs(weights_folder_path + '/radar' + piece_of_string, exist_ok=True)
 
-        for filename in os.listdir(cloud_folder_path):
+        for filename in os.listdir(data_folder_path):
             print(f'Processing cloud file: {filename}')
-            f = os.path.join('/Users/luigigisolfi/' + str(cloud_name), filename)
+            f = os.path.join(data_folder_path, filename)
             if (os.path.isdir(f) == True):
                 print(f'File: {f} is a directory. Skipping...\n')
                 continue
