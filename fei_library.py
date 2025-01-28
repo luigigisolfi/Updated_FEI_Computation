@@ -520,14 +520,12 @@ class ComputeFEI:
         shells_ratios_path = os.path.join(output_folder_path, 'array_shells_ratios' + '/radar' + piece_of_string)
         radar_global_csi_path = os.path.join(output_folder_path, 'global_csi'+ '/radar' + piece_of_string)
         radar_cloud_only_csi_path = os.path.join(output_folder_path, 'cloud_only_csi' + '/radar' + piece_of_string)
-        radar_cloud_only_csi_path_no_weights = os.path.join(radar_cloud_only_csi_path, 'cloud_csi_no_weights' + '/radar' + piece_of_string)
-        radar_cloud_only_csi_path_weights = os.path.join(radar_cloud_only_csi_path, 'cloud_csi_weights' + '/radar' + piece_of_string)
 
         folder_paths = [
             cloud_folder_path, csi_background_folder, data_folder_path, output_folder_path,
             weights_folder_path, figures_folder_path, csi_post_pre_folder_path,
             shells_ratios_path, radar_global_csi_path, radar_cloud_only_csi_path,
-            radar_cloud_only_csi_path_no_weights, radar_cloud_only_csi_path_weights
+            radar_cloud_only_csi_path
         ]
 
         # Create folders if they do not exist
@@ -658,11 +656,11 @@ class ComputeFEI:
         array_cumulative_cloud_csi_no_weights = np.transpose(np.array([self.day_list,self.global_csi_cloud_only_list_no_weights]))
         array_global_csi = np.transpose(np.array([self.day_list, self.global_csi_list]))
 
-        with open(os.path.join(radar_cloud_only_csi_path_weights, 'cloud_only_csi_weights'), 'w') as fw:
+        with open(os.path.join(radar_cloud_only_csi_path, 'cloud_only_csi_weights'), 'w') as fw:
             for line in array_cumulative_cloud_csi:
                 fw.writelines(str(line)[1:-1] + '\n')
 
-        with open(os.path.join(radar_cloud_only_csi_path_no_weights, 'cloud_only_csi_no_weights'), 'w') as fw:
+        with open(os.path.join(radar_cloud_only_csi_path, 'cloud_only_csi_no_weights'), 'w') as fw:
             for line in array_cumulative_cloud_csi_no_weights:
                 fw.writelines(str(line)[1:-1] + '\n')
 
@@ -748,14 +746,12 @@ class ComputeFEI:
         shells_ratios_path = os.path.join(output_folder_path, 'array_shells_ratios' + '/optical' + piece_of_string)
         optical_global_csi_path = os.path.join(output_folder_path, 'global_csi'+ '/optical' + piece_of_string)
         optical_cloud_only_csi_path = os.path.join(output_folder_path, 'cloud_only_csi' + '/optical' + piece_of_string)
-        optical_cloud_only_csi_path_no_weights = os.path.join(optical_cloud_only_csi_path, 'cloud_csi_no_weights' + '/optical' + piece_of_string)
-        optical_cloud_only_csi_path_weights = os.path.join(optical_cloud_only_csi_path, 'cloud_csi_weights' + '/optical' + piece_of_string)
 
         folder_paths = [
             cloud_folder_path, csi_background_folder, data_folder_path, output_folder_path,
             weights_folder_path, figures_folder_path, csi_post_pre_folder_path,
             shells_ratios_path, optical_global_csi_path, optical_cloud_only_csi_path,
-            optical_cloud_only_csi_path_no_weights, optical_cloud_only_csi_path_weights
+            optical_cloud_only_csi_path
         ]
 
         # Create folders if they do not exist
@@ -890,11 +886,11 @@ class ComputeFEI:
         array_cumulative_cloud_csi_no_weights = np.transpose(np.array([self.day_list,self.global_csi_cloud_only_list_no_weights]))
         array_global_csi = np.transpose(np.array([self.day_list, self.global_csi_list]))
 
-        with open(os.path.join(optical_cloud_only_csi_path_weights, 'cloud_only_csi_weights'), 'w') as fw:
+        with open(os.path.join(optical_cloud_only_csi_path, 'cloud_only_csi_weights'), 'w') as fw:
             for line in array_cumulative_cloud_csi:
                 fw.writelines(str(line)[1:-1] + '\n')
 
-        with open(os.path.join(optical_cloud_only_csi_path_no_weights, 'cloud_only_csi_no_weights'), 'w') as fw:
+        with open(os.path.join(optical_cloud_only_csi_path, 'cloud_only_csi_no_weights'), 'w') as fw:
             for line in array_cumulative_cloud_csi_no_weights:
                 fw.writelines(str(line)[1:-1] + '\n')
 
@@ -907,15 +903,15 @@ class ComputeFEI:
 
         ratios_100 = self.ratios_list[pos_100]
         ratios_1 = self.ratios_list[pos_1]
-        shells = np.arange(1250,2050,50)
+        shells = np.arange(1200,2000,50)
 
         array_shells_ratios_100 = np.transpose(np.array([shells,ratios_100]))
         array_shells_ratios_1 = np.transpose(np.array([shells,ratios_1]))
 
-        with open(shells_ratios_path+  '/array_shells_ratios_100_radar' + piece_of_string, 'w') as fw:
+        with open(shells_ratios_path+  '/array_shells_ratios_100_optical' + piece_of_string, 'w') as fw:
             for line in array_shells_ratios_100:
                 fw.writelines(str(line)[1:-1] + '\n')
-        with open(shells_ratios_path + '/array_shells_ratios_1_radar' + piece_of_string, 'w') as fw:
+        with open(shells_ratios_path + '/array_shells_ratios_1_optical' + piece_of_string, 'w') as fw:
             for line in array_shells_ratios_1:
                 fw.writelines(str(line)[1:-1] + '\n')
         return(self.day_list, self.global_csi_cloud_only_list, self.global_csi_cloud_only_list_no_weights, self.global_csi_list, self.global_csi_list_no_weights, self.ratios_list)
@@ -937,6 +933,7 @@ class ComputeFEI:
         weights_folder_path = os.path.join(output_folder_path, 'weights' + '/radar' + piece_of_string)
         background_filename = 'csi0_radar' + piece_of_string + '.out'
         csi_background_folder = os.path.join(cloud_folder_path, 'csi_background')
+        os.makedirs(weights_folder_path, exist_ok=True)
 
         if not os.path.isfile(background_population_file):
             print(f'Could not find background population file: {background_population_file}.\nPlease provide it and try again.\nAborting...')
@@ -999,6 +996,7 @@ class ComputeFEI:
         weights_folder_path = os.path.join(output_folder_path, 'weights' + '/optical' + piece_of_string)
         background_filename = 'csi0_optical' + piece_of_string + '.out'
         csi_background_folder = os.path.join(cloud_folder_path, 'csi_background')
+        os.makedirs(weights_folder_path, exist_ok=True)
 
         if not os.path.isfile(background_population_file):
             print(f'Could not find background population file: {background_population_file}.\nPlease provide it and try again.\nAborting...')
@@ -1109,8 +1107,8 @@ class ComputeFEI:
 
         cloud_folder_path = os.path.join(clouds_folder_path, cloud_name)
         output_folder_path = os.path.join(cloud_folder_path, 'output')
-        shells_ratios_path = os.path.join(output_folder_path, 'array_shells_ratios' + '/radar' + piece_of_string)
-        csi_post_pre_folder_path = os.path.join(output_folder_path, 'csi_post_pre' + '/radar' + piece_of_string)
+        shells_ratios_path = os.path.join(output_folder_path, 'array_shells_ratios' + f'/{network_type}' + piece_of_string)
+        csi_post_pre_folder_path = os.path.join(output_folder_path, 'csi_post_pre' + f'/{network_type}' + piece_of_string)
         figures_folder_path = os.path.join(output_folder_path, 'figures' + f'/{network_type}' + piece_of_string)
         size = piece_of_string.split('_')[1]
         shells, ratios_1 = np.loadtxt(shells_ratios_path + '/array_shells_ratios_1_' + f'{network_type}{piece_of_string}', unpack= True, usecols = (0,1))
@@ -1159,125 +1157,125 @@ class ComputeFEI:
 # In[29]:
 
 
-def multi_plotter_csi(pieces_of_strings, nube, network_type):
+    def multi_plotter_csi(self, pieces_of_strings, nube, network_type, figures_folder, global_csi_folder, csi_cloud_only_folder):
 
-    colors = ['black', 'grey', 'red']
-    if len(nube) == 11:
-        h_frag = round(float(nube[5:8]))
-    elif len(nube) == 12:
-        h_frag = round(float(nube[5:9]))
+        colors = ['red', 'grey', 'black']
+        if len(nube) == 11:
+            h_frag = round(float(nube[5:8]))
+        elif len(nube) == 12:
+            h_frag = round(float(nube[5:9]))
 
-    fig1, ax1 = plt.subplots()
-    fig2, ax2 = plt.subplots()
-    fig3, ax3 = plt.subplots()
+        fig1, ax1 = plt.subplots()
+        fig2, ax2 = plt.subplots()
+        fig3, ax3 = plt.subplots()
 
-    for piece_of_string, c in zip(pieces_of_strings, colors):
-        print(piece_of_string, c)
-        day_list, global_csi_cloud_only_list= np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi_cloud_only' + f'{piece_of_string}', unpack= True, usecols = (0,1))
-        global_csi_list = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi' + f'{piece_of_string}', unpack= True, usecols = 1)
-        cloud_percentage_contribution = 100*global_csi_cloud_only_list/global_csi_list
+        for piece_of_string, c in zip(pieces_of_strings, colors):
+            print(piece_of_string, c)
+            day_list, global_csi_cloud_only_list= np.loadtxt(csi_cloud_only_folder + f'/{network_type}{piece_of_string}/cloud_only_csi_weights', unpack= True, usecols = (0,1))
+            global_csi_list = np.loadtxt(global_csi_folder + f'/{network_type}{piece_of_string}/global_csi', unpack= True, usecols = 1)
+            cloud_percentage_contribution = 100*global_csi_cloud_only_list/global_csi_list
 
-        if piece_of_string[0:4] == '_5cm':
-            ax1.plot(day_list, global_csi_cloud_only_list, 'o', markersize = 3, label = f'{piece_of_string[1:4]} ' + f'{piece_of_string[5:]}' , color = c)
-            ax2.plot(day_list, cloud_percentage_contribution, 'o', markersize = 3, label = f'{piece_of_string[1:4]} ' + f'{piece_of_string[5:]}' , color = c)
-            ax3.plot(day_list, global_csi_list, 'o', markersize = 3, label = f'{piece_of_string[1:4]} ' + f'{piece_of_string[5:]}' , color = c)
+            if piece_of_string[0:4] == '_5cm':
+                ax1.plot(day_list, global_csi_cloud_only_list, 'o', markersize = 3, label = f'{piece_of_string[1:4]} ' + f'{piece_of_string[5:]}' , color = c)
+                ax2.plot(day_list, cloud_percentage_contribution, 'o', markersize = 3, label = f'{piece_of_string[1:4]} ' + f'{piece_of_string[5:]}' , color = c)
+                ax3.plot(day_list, global_csi_list, 'o', markersize = 3, label = f'{piece_of_string[1:4]} ' + f'{piece_of_string[5:]}' , color = c)
 
-        else:
-            ax1.plot(day_list, global_csi_cloud_only_list, 'o', markersize = 3, label = f'{piece_of_string[1:5]} ' + f'{piece_of_string[6:]}' , color = c)
-            ax2.plot(day_list, cloud_percentage_contribution, 'o', markersize = 3, label = f'{piece_of_string[1:5]} ' + f'{piece_of_string[6:]}' , color = c)
-            ax3.plot(day_list, global_csi_list, 'o', markersize = 3, label = f'{piece_of_string[1:5]} ' + f'{piece_of_string[6:]}' , color = c)
+            else:
+                ax1.plot(day_list, global_csi_cloud_only_list, 'o', markersize = 3, label = f'{piece_of_string[1:5]} ' + f'{piece_of_string[6:]}' , color = c)
+                ax2.plot(day_list, cloud_percentage_contribution, 'o', markersize = 3, label = f'{piece_of_string[1:5]} ' + f'{piece_of_string[6:]}' , color = c)
+                ax3.plot(day_list, global_csi_list, 'o', markersize = 3, label = f'{piece_of_string[1:5]} ' + f'{piece_of_string[6:]}' , color = c)
 
-    day_list, global_csi_cloud_only_list_no_weights = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi_cloud_only_list_no_weights' + f'{piece_of_string}', unpack= True, usecols = (0,1))
-    ax1.plot(day_list, global_csi_cloud_only_list_no_weights, 'o', markersize = 3, label = 'no weights' , color = 'blue')
-    ax1.set(xlabel = 'Time From Collision (Days)', ylabel = 'Cloud csi')
-    ax1.legend(loc = 'upper right', prop={'size': 6})
-    ax1.set_title("Cloud csi (on different " + f"{network_type}" + " networks)", fontsize = 'small')
-    plt.tight_layout()
-    fig1.show()
-    fig1.savefig('/Users/luigigisolfi/' + str(cloud_name)+ f'/figures/{network_type}' + '_Cumulative_Cloud_csi_comparison',  bbox_inches="tight")
-
-    ax2.plot(day_list, global_csi_cloud_only_list_no_weights, 'o', markersize = 3, label = 'no weights' , color = 'blue')
-    ax2.set(xlabel = 'Time From Collision (Days)', ylabel = 'Cloud csi Contribution to Global csi (%)')
-    ax2.legend(loc = 'upper right', prop={'size': 6})
-    ax2.set_title("Cloud's Contribution to Global csi (on different " + f"{network_type}" + " networks)", fontsize = 'small')
-    plt.tight_layout()
-    fig2.show()
-    fig2.savefig('/Users/luigigisolfi/' + str(cloud_name)+ f'/figures/{network_type}' + '_Cumulative_Cloud_csi_comparison_perc',  bbox_inches="tight")
-
-    ax3.set(xlabel = 'Time From Collision (Days)', ylabel = 'Global csi')
-    ax3.legend(loc = 'upper right', prop={'size': 6})
-    ax3.set_title("Global csi (on different " + f"{network_type}" + " networks)", fontsize = 'small')
-    plt.tight_layout()
-    fig3.show()
-    fig3.savefig('/Users/luigigisolfi/' + str(cloud_name)+ f'/figures/{network_type}' + '_Global_csi_comparison',  bbox_inches="tight")
-
-
-    if network_type == 'radar':
-        piece_of_string_0 = '_5cm_1200km'
-        piece_of_string_1 = '_15cm_1200km'
-        day_list_0, global_csi_list_0 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi' + f'{piece_of_string_0}', unpack= True, usecols = (0,1))
-        day_list_1, global_csi_list_1 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi' + f'{piece_of_string_1}', unpack= True, usecols = (0,1))
-        ratio_performance = global_csi_list_0/global_csi_list_1
-        percentage_ratio_performance = (1 - global_csi_list_0/global_csi_list_1)*100
-
-        print(global_csi_list_0)
-        print(global_csi_list_1)
-        print(ratio_performance)
-
-        fig, axs = plt.subplots(3, 1)
-
-        axs[0].plot(day_list_0, global_csi_list_1,'o', markersize = 3)
-        axs[0].set_title(f'Radar 15 cm, Coll. Altitude = {h_frag} km', fontsize = 'small')
-        axs[1].plot(day_list_0, global_csi_list_0, 'o', markersize = 3)
-        axs[1].set_title(f'Radar 5 cm, Coll. Altitude = {h_frag} km',  fontsize = 'small')
-        axs[2].plot(day_list_0, percentage_ratio_performance, 'o', markersize = 3)
-        axs[2].set_title('Performance Comparison', fontsize = 'small')
-
-
-        axs[0].set(xlabel='Time From Collision (Days)', ylabel='Global csi')
-        axs[1].set(xlabel='Time From Collision (Days)', ylabel='Global csi')
-        axs[2].set(xlabel='Time From Collision (Days)', ylabel='Risk Reduction (%)')
-
-        # Hide x labels and tick labels for top plots and y ticks for right plots.
-        for ax in axs.flat:
-            ax.label_outer()
-
+        day_list, global_csi_cloud_only_list_no_weights = np.loadtxt(csi_cloud_only_folder + f'/{network_type}{piece_of_string}/cloud_only_csi_no_weights', unpack= True, usecols = (0,1))
+        ax1.plot(day_list, global_csi_cloud_only_list_no_weights, 'o', markersize = 3, label = 'no weights' , color = 'blue')
+        ax1.set(xlabel = 'Time From Collision (Days)', ylabel = 'Cloud csi')
+        ax1.legend(loc = 'upper right', prop={'size': 6})
+        ax1.set_title("Cloud csi (on different " + f"{network_type}" + " networks)", fontsize = 'small')
         plt.tight_layout()
-        plt.ticklabel_format(useOffset=False)
-        fig.savefig('/Users/luigigisolfi/' + str(cloud_name)+ f'/figures/{network_type}' + '_Performance_Ratios',  bbox_inches="tight")
+        fig1.show()
+        fig1.savefig(figures_folder + f'{network_type}_Cumulative_Cloud_csi_comparison',  bbox_inches="tight")
 
-    elif network_type == 'optical':
-        piece_of_string_0 = '_5cm_2000km'
-        piece_of_string_1 = '_20cm_2000km'
-        day_list_0, global_csi_list_0 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi' + f'{piece_of_string_0}', unpack= True, usecols = (0,1))
-        day_list_1, global_csi_list_1 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi' + f'{piece_of_string_1}', unpack= True, usecols = (0,1))
-        ratio_performance = global_csi_list_0/global_csi_list_1
-        percentage_ratio_performance = (1 - global_csi_list_0/global_csi_list_1)*100
-
-        print(global_csi_list_0)
-        print(global_csi_list_1)
-        print(ratio_performance)
-
-        fig, axs = plt.subplots(3, 1)
-        axs[0].plot(day_list_0, global_csi_list_1,'o', markersize = 3)
-        axs[0].set_title(f'Optical 20 cm, Coll. Altitude = {h_frag} km', fontsize = 'small')
-        axs[1].plot(day_list_0, global_csi_list_0, 'o', markersize = 3)
-        axs[1].set_title(f'Optical 5 cm, Coll. Altitude = {h_frag} km',  fontsize = 'small')
-        axs[2].plot(day_list_0, percentage_ratio_performance, 'o', markersize = 3)
-        axs[2].set_title('Performance Comparison', fontsize = 'small')
-
-
-        axs[0].set(xlabel='Time From Collision (Days)', ylabel='Global csi')
-        axs[1].set(xlabel='Time From Collision (Days)', ylabel='Global csi')
-        axs[2].set(xlabel='Time From Collision (Days)', ylabel='Risk Reduction (%)')
-
-        # Hide x labels and tick labels for top plots and y ticks for right plots.
-        for ax in axs.flat:
-            ax.label_outer()
-
-        plt.ticklabel_format(useOffset=False)
+        ax2.plot(day_list, global_csi_cloud_only_list_no_weights, 'o', markersize = 3, label = 'no weights' , color = 'blue')
+        ax2.set(xlabel = 'Time From Collision (Days)', ylabel = 'Cloud csi Contribution to Global csi (%)')
+        ax2.legend(loc = 'upper right', prop={'size': 6})
+        ax2.set_title("Cloud's Contribution to Global csi (on different " + f"{network_type}" + " networks)", fontsize = 'small')
         plt.tight_layout()
-        fig.savefig('/Users/luigigisolfi/' + str(cloud_name)+ f'/figures/{network_type}' + '_Performance_Ratios',  bbox_inches="tight")
+        fig2.show()
+        fig2.savefig(figures_folder + f'{network_type}_Cumulative_Cloud_csi_comparison_perc',  bbox_inches="tight")
+
+        ax3.set(xlabel = 'Time From Collision (Days)', ylabel = 'Global csi')
+        ax3.legend(loc = 'upper right', prop={'size': 6})
+        ax3.set_title("Global csi (on different " + f"{network_type}" + " networks)", fontsize = 'small')
+        plt.tight_layout()
+        fig3.show()
+        fig3.savefig(figures_folder + f'{network_type}_Global_csi_comparison',  bbox_inches="tight")
+
+
+        #if network_type == 'radar':
+        #    piece_of_string_0 = '_5cm_1200km'
+        #    piece_of_string_1 = '_15cm_1200km'
+        #    day_list_0, global_csi_list_0 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi' + f'{piece_of_string_0}', unpack= True, usecols = (0,1))
+        #    day_list_1, global_csi_list_1 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi' + f'{piece_of_string_1}', unpack= True, usecols = (0,1))
+        #    ratio_performance = global_csi_list_0/global_csi_list_1
+        #    percentage_ratio_performance = (1 - global_csi_list_0/global_csi_list_1)*100
+
+        #    print(global_csi_list_0)
+        #    print(global_csi_list_1)
+        #    print(ratio_performance)
+
+        #    fig, axs = plt.subplots(3, 1)
+
+        #    axs[0].plot(day_list_0, global_csi_list_1,'o', markersize = 3)
+        #    axs[0].set_title(f'Radar 15 cm, Coll. Altitude = {h_frag} km', fontsize = 'small')
+        #    axs[1].plot(day_list_0, global_csi_list_0, 'o', markersize = 3)
+        #    axs[1].set_title(f'Radar 5 cm, Coll. Altitude = {h_frag} km',  fontsize = 'small')
+        #    axs[2].plot(day_list_0, percentage_ratio_performance, 'o', markersize = 3)
+        #    axs[2].set_title('Performance Comparison', fontsize = 'small')
+
+
+        #    axs[0].set(xlabel='Time From Collision (Days)', ylabel='Global csi')
+        #    axs[1].set(xlabel='Time From Collision (Days)', ylabel='Global csi')
+        #    axs[2].set(xlabel='Time From Collision (Days)', ylabel='Risk Reduction (%)')
+
+        #    # Hide x labels and tick labels for top plots and y ticks for right plots.
+        #    for ax in axs.flat:
+        #        ax.label_outer()
+
+        #    plt.tight_layout()
+        #    plt.ticklabel_format(useOffset=False)
+        #    fig.savefig('/Users/luigigisolfi/' + str(cloud_name)+ f'/figures/{network_type}' + '_Performance_Ratios',  bbox_inches="tight")
+
+        #elif network_type == 'optical':
+        #    piece_of_string_0 = '_5cm_2000km'
+        #    piece_of_string_1 = '_20cm_2000km'
+        #    day_list_0, global_csi_list_0 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi' + f'{piece_of_string_0}', unpack= True, usecols = (0,1))
+        #    day_list_1, global_csi_list_1 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi' + f'{piece_of_string_1}', unpack= True, usecols = (0,1))
+        #    ratio_performance = global_csi_list_0/global_csi_list_1
+        #    percentage_ratio_performance = (1 - global_csi_list_0/global_csi_list_1)*100
+
+        #    print(global_csi_list_0)
+        #    print(global_csi_list_1)
+        #    print(ratio_performance)
+
+        #    fig, axs = plt.subplots(3, 1)
+        #    axs[0].plot(day_list_0, global_csi_list_1,'o', markersize = 3)
+        #    axs[0].set_title(f'Optical 20 cm, Coll. Altitude = {h_frag} km', fontsize = 'small')
+        #    axs[1].plot(day_list_0, global_csi_list_0, 'o', markersize = 3)
+        #    axs[1].set_title(f'Optical 5 cm, Coll. Altitude = {h_frag} km',  fontsize = 'small')
+        #    axs[2].plot(day_list_0, percentage_ratio_performance, 'o', markersize = 3)
+        #    axs[2].set_title('Performance Comparison', fontsize = 'small')
+
+
+        #    axs[0].set(xlabel='Time From Collision (Days)', ylabel='Global csi')
+        #    axs[1].set(xlabel='Time From Collision (Days)', ylabel='Global csi')
+        #    axs[2].set(xlabel='Time From Collision (Days)', ylabel='Risk Reduction (%)')
+
+            # Hide x labels and tick labels for top plots and y ticks for right plots.
+        #    for ax in axs.flat:
+        #        ax.label_outer()
+
+        #    plt.ticklabel_format(useOffset=False)
+        #    plt.tight_layout()
+        #    fig.savefig('/Users/luigigisolfi/' + str(cloud_name)+ f'/figures/{network_type}' + '_Performance_Ratios',  bbox_inches="tight")
 
 
 # In[30]:
