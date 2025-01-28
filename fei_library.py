@@ -1187,27 +1187,27 @@ class ComputeFEI:
 
         day_list, global_csi_cloud_only_list_no_weights = np.loadtxt(csi_cloud_only_folder + f'/{network_type}{piece_of_string}/cloud_only_csi_no_weights', unpack= True, usecols = (0,1))
         ax1.plot(day_list, global_csi_cloud_only_list_no_weights, 'o', markersize = 3, label = 'no weights' , color = 'blue')
-        ax1.set(xlabel = 'Time From Collision (Days)', ylabel = 'Cloud csi')
+        ax1.set(xlabel = 'Time From Collision (Days)', ylabel = 'Cloud CSI')
         ax1.legend(loc = 'upper right', prop={'size': 6})
-        ax1.set_title("Cloud csi (on different " + f"{network_type}" + " networks)", fontsize = 'small')
+        ax1.set_title("Cloud CSI (on different " + f"{network_type}" + " networks)", fontsize = 'small')
         plt.tight_layout()
         fig1.show()
-        fig1.savefig(figures_folder + f'{network_type}_Cumulative_Cloud_csi_comparison',  bbox_inches="tight")
+        fig1.savefig(figures_folder + f'/{network_type}_Cumulative_Cloud_csi_comparison',  bbox_inches="tight")
 
         ax2.plot(day_list, global_csi_cloud_only_list_no_weights, 'o', markersize = 3, label = 'no weights' , color = 'blue')
-        ax2.set(xlabel = 'Time From Collision (Days)', ylabel = 'Cloud csi Contribution to Global csi (%)')
+        ax2.set(xlabel = 'Time From Collision (Days)', ylabel = 'Cloud CSI Contribution to Global CSI (%)')
         ax2.legend(loc = 'upper right', prop={'size': 6})
         ax2.set_title("Cloud's Contribution to Global csi (on different " + f"{network_type}" + " networks)", fontsize = 'small')
         plt.tight_layout()
         fig2.show()
-        fig2.savefig(figures_folder + f'{network_type}_Cumulative_Cloud_csi_comparison_perc',  bbox_inches="tight")
+        fig2.savefig(figures_folder + f'/{network_type}_Cumulative_Cloud_csi_comparison_perc',  bbox_inches="tight")
 
-        ax3.set(xlabel = 'Time From Collision (Days)', ylabel = 'Global csi')
+        ax3.set(xlabel = 'Time From Collision (Days)', ylabel = 'Global CSI')
         ax3.legend(loc = 'upper right', prop={'size': 6})
-        ax3.set_title("Global csi (on different " + f"{network_type}" + " networks)", fontsize = 'small')
+        ax3.set_title("Global CSI (on different " + f"{network_type}" + " networks)", fontsize = 'small')
         plt.tight_layout()
         fig3.show()
-        fig3.savefig(figures_folder + f'{network_type}_Global_csi_comparison',  bbox_inches="tight")
+        fig3.savefig(figures_folder + f'/{network_type}_Global_csi_comparison',  bbox_inches="tight")
 
 
         #if network_type == 'radar':
