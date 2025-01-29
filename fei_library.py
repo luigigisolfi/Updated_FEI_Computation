@@ -23,7 +23,6 @@ import matplotlib.pyplot as plt
 import os
 import math
 
-from radar_main_trial import global_csi_cloud_only_list, csi_cloud_only_folder, output_folder_path
 
 
 # # Auxiliary Functions - A library
@@ -1159,13 +1158,13 @@ class ComputeFEI:
 # In[29]:
 
 
-    def multi_plotter_csi(self, pieces_of_strings, nube, network_type, figures_folder, global_csi_folder, csi_cloud_only_folder):
+    def multi_plotter_csi(self, pieces_of_strings, cloud_name, network_type, figures_folder, global_csi_folder, csi_cloud_only_folder):
 
         colors = ['red', 'grey', 'black']
-        if len(nube) == 11:
-            h_frag = round(float(nube[5:8]))
-        elif len(nube) == 12:
-            h_frag = round(float(nube[5:9]))
+        if len(cloud_name) == 11:
+            h_frag = round(float(cloud_name[5:8]))
+        elif len(cloud_name) == 12:
+            h_frag = round(float(cloud_name[5:9]))
 
         fig1, ax1 = plt.subplots()
         fig2, ax2 = plt.subplots()
@@ -1277,135 +1276,74 @@ class ComputeFEI:
             fig.savefig(figures_folder + f'/{network_type}_Performance_Ratios',  bbox_inches="tight")
 
 
-    def get_cumulative_index_files(self,csi_cloud_only_folder, network_type, piece_of_string):
+    def get_cumulative_index_files(self, output_folder_path, network_type, piece_of_string):
 
+        csi_cloud_only_folder = os.path.join(output_folder_path, 'cloud_only_csi')
         day_list, global_csi_cloud_only_list= np.loadtxt(csi_cloud_only_folder +f'/{network_type}{piece_of_string}/cloud_only_csi_weights', unpack= True, usecols = (0,1))
         day_list, global_csi_cloud_only_list_no_weights = np.loadtxt(csi_cloud_only_folder +f'/{network_type}{piece_of_string}/cloud_only_csi_no_weights', unpack= True, usecols = (0,1))
 
-        cumulative_index = np.sum(global_csi_cloud_only_list)
+        cumulative_index_weights = np.sum(global_csi_cloud_only_list)
         cumulative_index_no_weights = np.sum(global_csi_cloud_only_list_no_weights)
 
         os.makedirs(output_folder_path + f'/cumulative_index/{network_type}{piece_of_string}', exist_ok=True)
 
         with open(output_folder_path + f'/cumulative_index/{network_type}{piece_of_string}/cumulative_index', 'w') as cumulative_index:
-            cumulative_index.write(f'CUMULATIVE INDEX: {cumulative_index}\n')
+            cumulative_index.write(f'CUMULATIVE INDEX: {cumulative_index_weights}\n')
             cumulative_index.write(f'CUMULATIVE INDEX_NO_WEIGHTS: {cumulative_index_no_weights}\n')
             cumulative_index.close()
 
-nubi = ['nube_450_km', 'nube_800_km']
-for nube in nubi:
-    csi_cumulative_list = []
-    csi_cumulative_no_weights_list = []
-    capability_list = []
-    if os.path.exists(f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_OPTICAL/'):
-        dir_path = f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_OPTICAL/'
-    else:
-        dir_path = f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_RADAR/'
-    for file in os.listdir(dir_path):
-        if file == '.ipynb_checkpoints' or '30' in file:
-            continue
-        print(file)
-        if len(file.split('_')[3]) == 4:
-            capability = float(file.split('_')[3][:2])
-            print(capability)
-        else:
-            capability = float(file.split('_')[3][:1])
-            print(capability)
 
-        csi_cumulative_both = np.loadtxt(f'{dir_path}/{file}', unpack=True, usecols=2)
-        csi_cumulative = csi_cumulative_both[0]
-        csi_cumulative_no_weights = csi_cumulative_both[1]
-        csi_cumulative_list.append(csi_cumulative)
-        csi_cumulative_no_weights_list.append(csi_cumulative_no_weights)
-        capability_list.append(capability)
+    def plot_cumulative_indexes(self, output_folder_path, network_type, cloud_names):
 
-    print(csi_cumulative_list)
+        for cloud_name in cloud_names:
+            figures_folder = os.path.join(output_folder_path, 'figures')
+            cumulative_index_folder = os.path.join(output_folder_path, 'cumulative_index')
+            piece_of_strings = []
+            for folder in os.listdir(cumulative_index_folder):
+                if network_type == 'radar':
+                    piece_of_strings.append(folder[5:])
+                else:
+                    piece_of_strings.append(folder[7:])
 
-    # Normalize the values
-    sorted_capabilities = np.sort(capability_list)
-    normalized_csi = np.sort(csi_cumulative_list)/1.209707813667907
+            csi_cumulative_list = []
+            csi_cumulative_no_weights_list = []
+            capability_list = []
+            for piece_of_string in piece_of_strings:
 
-    # Create scatter plot
-    plt.scatter(sorted_capabilities, normalized_csi, alpha=1)
+                s_min = piece_of_string.split('_')[1]
+                print(s_min)
 
-    # Add plot labels and title
-    plt.title('Cumulative Cloud csi Over 100 Days (Normalized)')
-    plt.xlabel(f'Minimum Detectable Size at {nube.split("_")[1]} km (cm)')
-    plt.ylabel('Cumulative Cloud csi')
+                if len(piece_of_string.split('_')[1]) == 4:
+                    capability = float(piece_of_string.split('_')[1][:2])
+                    print(capability)
+                else:
+                    capability = float(piece_of_string.split('_')[1][:1])
+                    print(capability)
 
-    # Save the plot
-    plt.savefig(f'/Users/luigigisolfi/{str(cloud_name)}/figures/Cumulative_csi_Results')
-    plt.show()
+                csi_cumulative_weights, csi_cumulative_no_weights = np.loadtxt(cumulative_index_folder + f'/{network_type}{piece_of_string}' + '/cumulative_index', unpack=True, usecols=2)
 
+                print(csi_cumulative_weights)
+                csi_cumulative_list.append(csi_cumulative_weights)
+                csi_cumulative_no_weights_list.append(csi_cumulative_no_weights)
+                capability_list.append(capability)
 
-# In[139]:
+                print(csi_cumulative_list)
 
+            # Normalize the values
+            sorted_capabilities = np.sort(capability_list)
+            normalized_csi = np.sort(csi_cumulative_list)/csi_cumulative_no_weights
 
-import os
-import numpy as np
-import matplotlib.pyplot as plt
+            print(normalized_csi)
+            print(sorted_capabilities)
 
-nubi = ['nube_1800_km', 'nube_1200_km']
+            # Create scatter plot
+            plt.scatter(sorted_capabilities, normalized_csi, alpha=1)
 
-# Initialize the plot
-plt.figure(figsize=(10, 6))
+        # Add plot labels and title
+        plt.title('Cumulative Cloud csi Over 100 Days (Normalized)')
+        plt.xlabel(f'Minimum Detectable Size at {cloud_name.split("_")[1]} km (cm)')
+        plt.ylabel('Cumulative Cloud csi')
 
-for nube in nubi:
-    print(nube)
-    csi_cumulative_list = []
-    csi_cumulative_no_weights_list = []
-    capability_list = []
-    if os.path.exists(f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_OPTICAL/'):
-        dir_path = f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_OPTICAL/'
-    else:
-        dir_path = f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_RADAR/'
-    for file in os.listdir(dir_path):
-        if file == '.ipynb_checkpoints' or '30' in file:
-            continue
-        print(file)
-        if len(file.split('_')[3]) == 4:
-            capability = float(file.split('_')[3][:2])
-            print(capability)
-        else:
-            capability = float(file.split('_')[3][:1])
-            print(capability)
-
-        csi_cumulative = np.loadtxt(f'{dir_path}/{file}', unpack=True, usecols=2)
-        csi_cumulative_list.append(csi_cumulative)
-        capability_list.append(capability)
-
-    # Normalize the values
-    sorted_capabilities =np.sort(capability_list)
-    normalized_csi = np.sort(csi_cumulative_list) /  0.27879089758704834 #normalization value for csi cloud no weights is taken from 1800 km (optical, value =  0.27879089758704834) or 800 km (radar, value = 1.209707813667907)
-
-    print(sorted_capabilities)
-    print(normalized_csi)
-    #normalized_csi = [row[0] for row in normalized_csi]
-
-
-    print(normalized_csi)
-    # Create scatter plot for this dataset
-    plt.scatter(
-        sorted_capabilities,
-        normalized_csi,
-        alpha=1,
-        s = 40,
-        label=f'$h_f$ = {nube.split("_")[1]} km'
-    )
-
-    # Optionally add text annotations (offset to the right)
-    #for x, y in zip(sorted_capabilities, normalized_csi):
-    #    plt.text(x + 0.1, y + 0.001, f'{y:.4f}', fontsize=8, ha='right', va='bottom')
-
-# Add plot labels, legend, and title
-plt.title('Cumulative Cloud csi Over 100 Days (Normalized)')
-plt.xlabel('Minimum Detectable Size (cm)')
-plt.ylabel('Cumulative Cloud csi')
-plt.legend()
-
-# Save and show the plot
-plt.savefig(f'/Users/luigigisolfi/{str(cloud_name)}/figures/Cumulative_csi_Results_Combined.png')
-plt.show()
-
-
-
+        # Save the plot
+        plt.savefig(figures_folder + f'/Cumulative_csi_Results')
+        plt.show()
