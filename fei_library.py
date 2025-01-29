@@ -23,6 +23,8 @@ import matplotlib.pyplot as plt
 import os
 import math
 
+from radar_main_trial import global_csi_cloud_only_list, csi_cloud_only_folder, output_folder_path
+
 
 # # Auxiliary Functions - A library
 # In what follows, we define some functions that we will need for
@@ -1074,27 +1076,27 @@ class ComputeFEI:
 
 
         plt.plot(day_list, global_csi_cloud_only_list, 'o', ms = 3, color = c)
-        plt.title(f'Cumulative Cloud csi ({network_type}, {s_min} cm)')
-        plt.xlabel('Days From Collision')
-        plt.ylabel('Cumulative Cloud csi')
+        plt.title(f'Cumulative Cloud CSI ({network_type}, s_min = {s_min} cm)')
+        plt.xlabel('Time From Fragmentation Epoch (Days)')
+        plt.ylabel('Cumulative Cloud CSI')
         plt.tight_layout()
         plt.savefig(os.path.join(figures_folder_path, 'Cumulative_Cloud_csi'))
         plt.show()
 
 
         plt.plot(day_list, global_csi_cloud_only_list_no_weights, 'o', ms = 3, color = 'blue')
-        plt.title('Cumulative Cloud csi (w_tr = 1)')
-        plt.xlabel('Days From Collision')
-        plt.ylabel('Cumulative Cloud csi')
+        plt.title('Cumulative Cloud CSI (w_tr = 1)')
+        plt.xlabel('Time From Fragmentation Epoch (Days)')
+        plt.ylabel('Cumulative Cloud CSI')
         plt.tight_layout()
         plt.savefig(os.path.join(figures_folder_path, 'Cumulative_Cloud_csi_no_track'))
         plt.show()
 
 
         plt.plot(day_list, global_csi_list, 'o', ms = 3, color = c)
-        plt.title(f'Cumulative csi  ({network_type}, {s_min} cm)')
-        plt.xlabel('Days From Collision')
-        plt.ylabel('Cumulative csi')
+        plt.title(f'Cumulative CSI  ({network_type}, s_min = {s_min} cm)')
+        plt.xlabel('Time From Fragmentation Epoch (Days)')
+        plt.ylabel('Cumulative CSI')
         plt.tight_layout()
         plt.savefig(os.path.join(figures_folder_path, 'Cumulative_csi'))
         plt.show()
@@ -1122,29 +1124,29 @@ class ComputeFEI:
 
         plt.plot(shells, ratios_1, label = 'Day 1', color = c)
         plt.plot(shells, ratios_100, label = 'Day 100',linestyle = '--', color = c)
-        plt.axvline(h_frag,0,linestyle = '-.',color = 'silver',label = 'Collision Altitude')
+        plt.axvline(h_frag,0,linestyle = '-.',color = 'silver',label = 'Fragmentation Altitude')
         plt.xlabel('Altitude (km)')
         plt.ylabel('Percentage FEI')
         plt.legend(loc = 'lower right', prop={'size': 6})
-        plt.title(f'Percentage FEI 1 and 100 Days After Collision, ({network_type}, {size})')
+        plt.title(f'Percentage FEI 1 and 100 Days After Fragmentation, ({network_type}, {size})')
         plt.yscale('log')
         plt.savefig(os.path.join(figures_folder_path,'Percentage_FEI_T0_T100'))
         plt.show()
 
         plt.plot(shells, diff_1, label = 'Day 1', color = c)
         plt.plot(shells, diff_100, label = 'Day 100', linestyle = '--', color = c)
-        plt.axvline(h_frag,0,linestyle = '-.',color = 'silver',label = 'Collision Altitude')
+        plt.axvline(h_frag,0,linestyle = '-.',color = 'silver',label = 'Fragmentation Altitude')
         plt.xlabel('Altitude (km)')
         plt.ylabel('csi_post - csi_pre')
         plt.legend(loc = 'lower right', prop={'size': 6})
-        plt.title(f'FEI 1 and 100 Days After Collision ({network_type}, {size})')
+        plt.title(f'FEI 1 and 100 Days After Fragmentation ({network_type}, {size})')
         plt.yscale('log')
         plt.savefig(os.path.join(figures_folder_path,'Diff_FEI_T0_T100'))
         plt.show()
 
         plt.plot(shells, diff_1*ratios_1, label = 'Day 1', color = c)
         plt.plot(shells, diff_100*ratios_100, label = 'Day 100',linestyle = '--', color = c)
-        plt.axvline(h_frag,0,linestyle = '-.',color = 'silver',label = 'Collision Altitude')
+        plt.axvline(h_frag,0,linestyle = '-.',color = 'silver',label = 'Fragmentation Altitude')
         plt.xlabel('Altitude (km)')
         plt.ylabel('Perc_FEI * Diff')
         plt.legend(loc = 'lower right', prop={'size': 6})
@@ -1187,7 +1189,7 @@ class ComputeFEI:
 
         day_list, global_csi_cloud_only_list_no_weights = np.loadtxt(csi_cloud_only_folder + f'/{network_type}{piece_of_string}/cloud_only_csi_no_weights', unpack= True, usecols = (0,1))
         ax1.plot(day_list, global_csi_cloud_only_list_no_weights, 'o', markersize = 3, label = 'no weights' , color = 'blue')
-        ax1.set(xlabel = 'Time From Collision (Days)', ylabel = 'Cloud CSI')
+        ax1.set(xlabel = 'Time From Fragmentation Epoch (Days)', ylabel = 'Cloud CSI')
         ax1.legend(loc = 'upper right', prop={'size': 6})
         ax1.set_title("Cloud CSI (on different " + f"{network_type}" + " networks)", fontsize = 'small')
         plt.tight_layout()
@@ -1195,14 +1197,14 @@ class ComputeFEI:
         fig1.savefig(figures_folder + f'/{network_type}_Cumulative_Cloud_csi_comparison',  bbox_inches="tight")
 
         ax2.plot(day_list, global_csi_cloud_only_list_no_weights, 'o', markersize = 3, label = 'no weights' , color = 'blue')
-        ax2.set(xlabel = 'Time From Collision (Days)', ylabel = 'Cloud CSI Contribution to Global CSI (%)')
+        ax2.set(xlabel = 'Time From Fragmentation Epoch (Days)', ylabel = 'Cloud CSI Contribution to Global CSI (%)')
         ax2.legend(loc = 'upper right', prop={'size': 6})
-        ax2.set_title("Cloud's Contribution to Global csi (on different " + f"{network_type}" + " networks)", fontsize = 'small')
+        ax2.set_title("Cloud's Contribution to Global CSI (on different " + f"{network_type}" + " networks)", fontsize = 'small')
         plt.tight_layout()
         fig2.show()
         fig2.savefig(figures_folder + f'/{network_type}_Cumulative_Cloud_csi_comparison_perc',  bbox_inches="tight")
 
-        ax3.set(xlabel = 'Time From Collision (Days)', ylabel = 'Global CSI')
+        ax3.set(xlabel = 'Time From Fragmentation Epoch (Days)', ylabel = 'Global CSI')
         ax3.legend(loc = 'upper right', prop={'size': 6})
         ax3.set_title("Global CSI (on different " + f"{network_type}" + " networks)", fontsize = 'small')
         plt.tight_layout()
@@ -1210,162 +1212,200 @@ class ComputeFEI:
         fig3.savefig(figures_folder + f'/{network_type}_Global_csi_comparison',  bbox_inches="tight")
 
 
-        #if network_type == 'radar':
-        #    piece_of_string_0 = '_5cm_1200km'
-        #    piece_of_string_1 = '_15cm_1200km'
-        #    day_list_0, global_csi_list_0 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi' + f'{piece_of_string_0}', unpack= True, usecols = (0,1))
-        #    day_list_1, global_csi_list_1 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi' + f'{piece_of_string_1}', unpack= True, usecols = (0,1))
-        #    ratio_performance = global_csi_list_0/global_csi_list_1
-        #    percentage_ratio_performance = (1 - global_csi_list_0/global_csi_list_1)*100
+        if network_type == 'radar':
+            piece_of_string_0 = '_5cm_1200km'
+            piece_of_string_1 = '_15cm_1200km'
+            day_list_0, global_csi_list_0 = np.loadtxt(global_csi_folder + f'/{network_type}{piece_of_string_0}/global_csi', unpack= True, usecols = (0,1))
+            day_list_1, global_csi_list_1 = np.loadtxt(global_csi_folder + f'/{network_type}{piece_of_string_1}/global_csi', unpack= True, usecols = (0,1))
+            ratio_performance = global_csi_list_0/global_csi_list_1
+            percentage_ratio_performance = (1 - global_csi_list_0/global_csi_list_1)*100
 
-        #    print(global_csi_list_0)
-        #    print(global_csi_list_1)
-        #    print(ratio_performance)
-
-        #    fig, axs = plt.subplots(3, 1)
-
-        #    axs[0].plot(day_list_0, global_csi_list_1,'o', markersize = 3)
-        #    axs[0].set_title(f'Radar 15 cm, Coll. Altitude = {h_frag} km', fontsize = 'small')
-        #    axs[1].plot(day_list_0, global_csi_list_0, 'o', markersize = 3)
-        #    axs[1].set_title(f'Radar 5 cm, Coll. Altitude = {h_frag} km',  fontsize = 'small')
-        #    axs[2].plot(day_list_0, percentage_ratio_performance, 'o', markersize = 3)
-        #    axs[2].set_title('Performance Comparison', fontsize = 'small')
+            fig, axs = plt.subplots(3, 1)
 
 
-        #    axs[0].set(xlabel='Time From Collision (Days)', ylabel='Global csi')
-        #    axs[1].set(xlabel='Time From Collision (Days)', ylabel='Global csi')
-        #    axs[2].set(xlabel='Time From Collision (Days)', ylabel='Risk Reduction (%)')
-
-        #    # Hide x labels and tick labels for top plots and y ticks for right plots.
-        #    for ax in axs.flat:
-        #        ax.label_outer()
-
-        #    plt.tight_layout()
-        #    plt.ticklabel_format(useOffset=False)
-        #    fig.savefig('/Users/luigigisolfi/' + str(cloud_name)+ f'/figures/{network_type}' + '_Performance_Ratios',  bbox_inches="tight")
-
-        #elif network_type == 'optical':
-        #    piece_of_string_0 = '_5cm_2000km'
-        #    piece_of_string_1 = '_20cm_2000km'
-        #    day_list_0, global_csi_list_0 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi' + f'{piece_of_string_0}', unpack= True, usecols = (0,1))
-        #    day_list_1, global_csi_list_1 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi' + f'{piece_of_string_1}', unpack= True, usecols = (0,1))
-        #    ratio_performance = global_csi_list_0/global_csi_list_1
-        #    percentage_ratio_performance = (1 - global_csi_list_0/global_csi_list_1)*100
-
-        #    print(global_csi_list_0)
-        #    print(global_csi_list_1)
-        #    print(ratio_performance)
-
-        #    fig, axs = plt.subplots(3, 1)
-        #    axs[0].plot(day_list_0, global_csi_list_1,'o', markersize = 3)
-        #    axs[0].set_title(f'Optical 20 cm, Coll. Altitude = {h_frag} km', fontsize = 'small')
-        #    axs[1].plot(day_list_0, global_csi_list_0, 'o', markersize = 3)
-        #    axs[1].set_title(f'Optical 5 cm, Coll. Altitude = {h_frag} km',  fontsize = 'small')
-        #    axs[2].plot(day_list_0, percentage_ratio_performance, 'o', markersize = 3)
-        #    axs[2].set_title('Performance Comparison', fontsize = 'small')
+            axs[0].plot(day_list_0, global_csi_list_1,'o', markersize = 3)
+            axs[0].set_title(f'Radar 15 cm, h_frag = {h_frag} km', fontsize = 'small')
+            axs[1].plot(day_list_0, global_csi_list_0, 'o', markersize = 3)
+            axs[1].set_title(f'Radar 5 cm, h_frag = {h_frag} km',  fontsize = 'small')
+            axs[2].plot(day_list_0, percentage_ratio_performance, 'o', markersize = 3)
+            axs[2].set_title('Performance Comparison', fontsize = 'small')
 
 
-        #    axs[0].set(xlabel='Time From Collision (Days)', ylabel='Global csi')
-        #    axs[1].set(xlabel='Time From Collision (Days)', ylabel='Global csi')
-        #    axs[2].set(xlabel='Time From Collision (Days)', ylabel='Risk Reduction (%)')
+            axs[0].set(xlabel='Time From Fragmentation Epoch (Days)', ylabel='Global csi')
+            axs[1].set(xlabel='Time From Fragmentation Epoch (Days)', ylabel='Global csi')
+            axs[2].set(xlabel='Time From Fragmentation Epoch (Days)', ylabel='Risk Reduction (%)')
 
             # Hide x labels and tick labels for top plots and y ticks for right plots.
-        #    for ax in axs.flat:
-        #        ax.label_outer()
+            for ax in axs.flat:
+                ax.label_outer()
 
-        #    plt.ticklabel_format(useOffset=False)
-        #    plt.tight_layout()
-        #    fig.savefig('/Users/luigigisolfi/' + str(cloud_name)+ f'/figures/{network_type}' + '_Performance_Ratios',  bbox_inches="tight")
+            plt.tight_layout()
+            plt.ticklabel_format(useOffset=False)
+            fig.savefig(figures_folder + f'/{network_type}_Performance_Ratios',  bbox_inches="tight")
+
+        elif network_type == 'optical':
+            piece_of_string_0 = '_5cm_2000km'
+            piece_of_string_1 = '_20cm_2000km'
+            day_list_0, global_csi_list_0 = np.loadtxt(global_csi_folder + f'/{network_type}{piece_of_string_0}/global_csi', unpack= True, usecols = (0,1))
+            day_list_1, global_csi_list_1 = np.loadtxt(global_csi_folder + f'/{network_type}{piece_of_string_1}/global_csi', unpack= True, usecols = (0,1))
+            ratio_performance = global_csi_list_0/global_csi_list_1
+            percentage_ratio_performance = (1 - global_csi_list_0/global_csi_list_1)*100
+
+            print(global_csi_list_0)
+            print(global_csi_list_1)
+            print(ratio_performance)
+
+            fig, axs = plt.subplots(3, 1)
+            axs[0].plot(day_list_0, global_csi_list_1,'o', markersize = 3)
+            axs[0].set_title(f'Optical 20 cm, h_frag = {h_frag} km', fontsize = 'small')
+            axs[1].plot(day_list_0, global_csi_list_0, 'o', markersize = 3)
+            axs[1].set_title(f'Optical 5 cm, h_frag = {h_frag} km',  fontsize = 'small')
+            axs[2].plot(day_list_0, percentage_ratio_performance, 'o', markersize = 3)
+            axs[2].set_title('Performance Comparison', fontsize = 'small')
 
 
-# In[30]:
+            axs[0].set(xlabel='Time From Fragmentation Epoch (Days)', ylabel='Global csi')
+            axs[1].set(xlabel='Time From Fragmentation Epoch (Days)', ylabel='Global csi')
+            axs[2].set(xlabel='Time From Fragmentation Epoch (Days)', ylabel='Risk Reduction (%)')
+
+            # Hide x labels and tick labels for top plots and y ticks for right plots.
+            for ax in axs.flat:
+                ax.label_outer()
+
+            plt.ticklabel_format(useOffset=False)
+            plt.tight_layout()
+            fig.savefig(figures_folder + f'/{network_type}_Performance_Ratios',  bbox_inches="tight")
 
 
-def modulated_FEI(pieces_of_strings, nube, h_frag, network_type):
+    def get_cumulative_index_files(self,csi_cloud_only_folder, network_type, piece_of_string):
 
-    for piece_of_string in pieces_of_strings:
-        size = piece_of_string.split('_')[1]
-        shells, ratios_1 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/array_shells_ratios_1_{network_type}' + piece_of_string, unpack= True, usecols = (0,1))
-        shells, ratios_100 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/array_shells_ratios_100_{network_type}' + piece_of_string, unpack= True, usecols = (0,1))
-        csi_post_100_base, csi_pre_100_base = np.loadtxt('/Users/luigigisolfi/' + nube + f'/{network_type}_csi_post_pre_' + '100' + f'{piece_of_string}', unpack = True, usecols = (0,1))
-        csi_post_1_base, csi_pre_1_base = np.loadtxt('/Users/luigigisolfi/' + nube + f'/{network_type}_csi_post_pre_' + '001' + f'{piece_of_string}', unpack = True, usecols = (0,1))
+        day_list, global_csi_cloud_only_list= np.loadtxt(csi_cloud_only_folder +f'/{network_type}{piece_of_string}/cloud_only_csi_weights', unpack= True, usecols = (0,1))
+        day_list, global_csi_cloud_only_list_no_weights = np.loadtxt(csi_cloud_only_folder +f'/{network_type}{piece_of_string}/cloud_only_csi_no_weights', unpack= True, usecols = (0,1))
 
-        plt.plot(shells, ratios_1*(csi_post_1_base-csi_pre_1_base), label = 'Day 1', color = 'grey')
-        plt.plot(shells, ratios_100*(csi_post_1_base-csi_pre_1_base), linestyle = '--', label = 'Day 100', color = 'grey')
-        plt.axvline(h_frag,0,linestyle = '-.',color = 'silver',label = 'Collision Altitude')
-        plt.title(f'Modulated Perc FEI ({network_type}, {size})')
-        plt.xlabel('Altitude (km)')
-        plt.ylabel('Modulated Perc FEI')
-        plt.legend()
-        plt.tight_layout
-        plt.savefig('/Users/luigigisolfi/' + str(cloud_name)+ f'/figures/{network_type}{piece_of_string}' + '/Modulated_FEI_T0_T100', bbox_inches = 'tight')
-        plt.show()
+        cumulative_index = np.sum(global_csi_cloud_only_list)
+        cumulative_index_no_weights = np.sum(global_csi_cloud_only_list_no_weights)
 
-# def multi_plotter_FEI(pieces_of_strings, nube, h_frag, network_type):
+        os.makedirs(output_folder_path + f'/cumulative_index/{network_type}{piece_of_string}', exist_ok=True)
 
-#     colors = ['black', 'grey', 'red']
-#     for piece_of_string, c in zip(pieces_of_strings, colors):
-#         print(piece_of_string, c)
-#         shells, ratios_1 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/array_shells_ratios_1_{network_type}' + piece_of_string, unpack= True, usecols = (0,1))
-#         shells, ratios_100 = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/array_shells_ratios_100_{network_type}' + piece_of_string, unpack= True, usecols = (0,1))
-#         plt.plot(shells, ratios_1, label = f'{piece_of_string[1:5]} ' + f'{piece_of_string[6:]}' , color = c)
-#         plt.plot(shells, ratios_100, linestyle = '--', color = c)
+        with open(output_folder_path + f'/cumulative_index/{network_type}{piece_of_string}/cumulative_index', 'w') as cumulative_index:
+            cumulative_index.write(f'CUMULATIVE INDEX: {cumulative_index}\n')
+            cumulative_index.write(f'CUMULATIVE INDEX_NO_WEIGHTS: {cumulative_index_no_weights}\n')
+            cumulative_index.close()
 
-#     plt.axvline(h_frag,0,linestyle = '-.',color = 'silver',label = 'Collision Altitude')
-#     plt.xlabel('Altitude (km)')
-#     plt.ylabel('Percentage FEI')
-#     plt.legend(loc = 'lower right', prop={'size': 6})
-#     plt.title('Percentage FEI 1 and 100 Days After Collision (different ' + f'{network_type}' + ' networks)')
-#     plt.yscale('log')
-#     plt.savefig('/Users/luigigisolfi/' + str(cloud_name)+ f'/figures/{network_type}' + '_Percentage_FEI_T0_T100_multi_plot')
-#     plt.show()
+nubi = ['nube_450_km', 'nube_800_km']
+for nube in nubi:
+    csi_cumulative_list = []
+    csi_cumulative_no_weights_list = []
+    capability_list = []
+    if os.path.exists(f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_OPTICAL/'):
+        dir_path = f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_OPTICAL/'
+    else:
+        dir_path = f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_RADAR/'
+    for file in os.listdir(dir_path):
+        if file == '.ipynb_checkpoints' or '30' in file:
+            continue
+        print(file)
+        if len(file.split('_')[3]) == 4:
+            capability = float(file.split('_')[3][:2])
+            print(capability)
+        else:
+            capability = float(file.split('_')[3][:1])
+            print(capability)
 
-# if network_type == 'optical':
-#     csi_post_100_base, csi_pre_100_base = np.loadtxt('/Users/luigigisolfi/' + nube + f'/{network_type}_csi_post_pre_' + '100' + '_20cm_2000km', unpack = True, usecols = (0,1))
-#     csi_post_1_base, csi_pre_1_base = np.loadtxt('/Users/luigigisolfi/' + 'nube_1800_km' + f'/{network_type}_csi_post_pre_' + '001' + '_20cm_2000km', unpack = True, usecols = (0,1))
-#     days, csi_cloud_base = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi_cloud_only' + '_20cm_2000km', unpack= True, usecols = (0,1))
+        csi_cumulative_both = np.loadtxt(f'{dir_path}/{file}', unpack=True, usecols=2)
+        csi_cumulative = csi_cumulative_both[0]
+        csi_cumulative_no_weights = csi_cumulative_both[1]
+        csi_cumulative_list.append(csi_cumulative)
+        csi_cumulative_no_weights_list.append(csi_cumulative_no_weights)
+        capability_list.append(capability)
 
-# elif network_type == 'radar':
-#     csi_post_100_base, csi_pre_100_base = np.loadtxt('/Users/luigigisolfi/' + nube + f'/{network_type}_csi_post_pre_' + '100' + '_15cm_1200km', unpack = True, usecols = (0,1))
-#     csi_post_1_base, csi_pre_1_base = np.loadtxt('/Users/luigigisolfi/' + nube + f'/{network_type}_csi_post_pre_' + '001' + '_15cm_1200km', unpack = True, usecols = (0,1))
-#     days, csi_cloud_base = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi_cloud_only' + '_15cm_1200km', unpack= True, usecols = (0,1))
+    print(csi_cumulative_list)
 
-# pos_100_base = np.where(days == 100)
-# pos_1_base = np.where(days == 1)
-# csi_cloud_100_base = csi_cloud_base[pos_100_base]
-# csi_cloud_1_base = csi_cloud_base[pos_1_base]
-# csi_parent_pre_100 = csi_pre_100_base + csi_cloud_100_base - csi_post_100_base
-# print(csi_parent_pre_100, ' at 100')
-# csi_parent_pre_1 = csi_pre_1_base + csi_cloud_1_base - csi_post_1_base
-# print(csi_parent_pre_1, ' at 1')
+    # Normalize the values
+    sorted_capabilities = np.sort(capability_list)
+    normalized_csi = np.sort(csi_cumulative_list)/1.209707813667907
 
-# for piece_of_string, c in zip(pieces_of_strings, colors):
-#     days, csi_cloud = np.loadtxt('/Users/luigigisolfi/' + str(cloud_name)+ f'/{network_type}_array_global_csi_cloud_only' + piece_of_string, unpack= True, usecols = (0,1))
-#     pos_100 = np.where(days == 100)
-#     pos_1 = np.where(days == 1)
-#     csi_cloud_100 = csi_cloud[pos_100]
-#     csi_cloud_1 = csi_cloud[pos_1]
-#     csi_post_100 = csi_pre_100_base + csi_cloud_100 - csi_parent_pre_100
-#     csi_post_1 = csi_pre_1_base + csi_cloud_1 - csi_parent_pre_1
+    # Create scatter plot
+    plt.scatter(sorted_capabilities, normalized_csi, alpha=1)
 
-#     print('csi parent 100 is ', csi_parent_pre_100)
-#     print('csi parent 1 is ', csi_parent_pre_1)
-#     print(f'{piece_of_string} has csi_post_100 as ', csi_post_100)
-#     print(f'{piece_of_string} has csi_cloud_100 as ', csi_cloud_100)
-#     print(f'{piece_of_string} has csi_post_1 as ', csi_post_1)
-#     print(f'{piece_of_string} has csi_cloud_1 as ', csi_cloud_1)
+    # Add plot labels and title
+    plt.title('Cumulative Cloud csi Over 100 Days (Normalized)')
+    plt.xlabel(f'Minimum Detectable Size at {nube.split("_")[1]} km (cm)')
+    plt.ylabel('Cumulative Cloud csi')
 
-#     ratios_100_base = (csi_post_100 - csi_pre_100_base)/csi_pre_100_base
-#     ratios_1_base = (csi_post_1 - csi_pre_1_base)/csi_pre_1_base
-#     print(piece_of_string, c)
-#     plt.plot(shells, ratios_1_base, label = f'{piece_of_string[1:5]} ' + f'{piece_of_string[6:]}' , color = c)
-#     plt.plot(shells, ratios_100_base, linestyle = '--', color = c)
+    # Save the plot
+    plt.savefig(f'/Users/luigigisolfi/{str(cloud_name)}/figures/Cumulative_csi_Results')
+    plt.show()
 
-# plt.axvline(h_frag,0,linestyle = '-.',color = 'silver',label = 'Collision Altitude')
-# plt.xlabel('Altitude (km)')
-# plt.ylabel('Percentage FEI')
-# plt.legend(loc = 'lower right', prop={'size': 6})
-# plt.title('Percentage FEI 1 and 100 Days After Collision (different ' + f'{network_type}' + ' networks)')
-# plt.yscale('log')
-# plt.savefig('/Users/luigigisolfi/' + str(cloud_name)+ f'/figures/{network_type}' + '_Percentage_FEI_T0_T100_multi_plot_base')
-# plt.show()
+
+# In[139]:
+
+
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+
+nubi = ['nube_1800_km', 'nube_1200_km']
+
+# Initialize the plot
+plt.figure(figsize=(10, 6))
+
+for nube in nubi:
+    print(nube)
+    csi_cumulative_list = []
+    csi_cumulative_no_weights_list = []
+    capability_list = []
+    if os.path.exists(f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_OPTICAL/'):
+        dir_path = f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_OPTICAL/'
+    else:
+        dir_path = f'/Users/luigigisolfi/{str(cloud_name)}/CUMULATIVE_INDEX_RADAR/'
+    for file in os.listdir(dir_path):
+        if file == '.ipynb_checkpoints' or '30' in file:
+            continue
+        print(file)
+        if len(file.split('_')[3]) == 4:
+            capability = float(file.split('_')[3][:2])
+            print(capability)
+        else:
+            capability = float(file.split('_')[3][:1])
+            print(capability)
+
+        csi_cumulative = np.loadtxt(f'{dir_path}/{file}', unpack=True, usecols=2)
+        csi_cumulative_list.append(csi_cumulative)
+        capability_list.append(capability)
+
+    # Normalize the values
+    sorted_capabilities =np.sort(capability_list)
+    normalized_csi = np.sort(csi_cumulative_list) /  0.27879089758704834 #normalization value for csi cloud no weights is taken from 1800 km (optical, value =  0.27879089758704834) or 800 km (radar, value = 1.209707813667907)
+
+    print(sorted_capabilities)
+    print(normalized_csi)
+    #normalized_csi = [row[0] for row in normalized_csi]
+
+
+    print(normalized_csi)
+    # Create scatter plot for this dataset
+    plt.scatter(
+        sorted_capabilities,
+        normalized_csi,
+        alpha=1,
+        s = 40,
+        label=f'$h_f$ = {nube.split("_")[1]} km'
+    )
+
+    # Optionally add text annotations (offset to the right)
+    #for x, y in zip(sorted_capabilities, normalized_csi):
+    #    plt.text(x + 0.1, y + 0.001, f'{y:.4f}', fontsize=8, ha='right', va='bottom')
+
+# Add plot labels, legend, and title
+plt.title('Cumulative Cloud csi Over 100 Days (Normalized)')
+plt.xlabel('Minimum Detectable Size (cm)')
+plt.ylabel('Cumulative Cloud csi')
+plt.legend()
+
+# Save and show the plot
+plt.savefig(f'/Users/luigigisolfi/{str(cloud_name)}/figures/Cumulative_csi_Results_Combined.png')
+plt.show()
+
+
+
