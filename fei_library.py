@@ -23,8 +23,6 @@ import matplotlib.pyplot as plt
 import os
 import math
 
-
-
 # # Auxiliary Functions - A library
 # In what follows, we define some functions that we will need for
 # * the computation of both radar and optical weights to be applied to the Criticality of Spacecraft Index (csi)
@@ -549,7 +547,12 @@ class ComputeFEI:
             if (filename[6:9].isnumeric() and float(filename[6:9]) > 100): # process only the first 100 days.
                 continue
 
-            epoch, n, area, mass, a, e, inc, Omega, omega, M = np.loadtxt(f, unpack = True, usecols = (0,1,2,3,4,5,6,7,8,9))
+            try:
+                epoch, n, area, mass, a, e, inc, Omega, omega, M = np.loadtxt(f, unpack = True, usecols = (0,1,2,3,4,5,6,7,8,9))
+
+            except ValueError as e:
+                print(f'Error reading file: {filename}. Error: {e}')
+                continue
 
             sizes = np.sqrt(4*area/np.pi) #area in m^2, sizes in m
             sizes = sizes*100 #in cm
@@ -775,7 +778,12 @@ class ComputeFEI:
             if (filename[6:9].isnumeric() and float(filename[6:9]) > 100):
                 continue
 
-            epoch, n, area, mass, a, e, inc, Omega, omega, M = np.loadtxt(f, unpack = True, usecols = (0,1,2,3,4,5,6,7,8,9))
+            try:
+                epoch, n, area, mass, a, e, inc, Omega, omega, M = np.loadtxt(f, unpack = True, usecols = (0,1,2,3,4,5,6,7,8,9))
+
+            except ValueError as e:
+                print(f'Error reading file: {filename}. Error: {e}')
+                continue
 
             sizes = np.sqrt(4*area/np.pi) #area in m^2, sizes in m
             sizes = sizes*100 #in cm
@@ -935,6 +943,8 @@ class ComputeFEI:
         background_filename = 'csi0_radar' + piece_of_string + '.out'
         csi_background_folder = os.path.join(cloud_folder_path, 'csi_background')
         os.makedirs(weights_folder_path, exist_ok=True)
+        os.makedirs(csi_background_folder, exist_ok=True)
+
 
         if not os.path.isfile(background_population_file):
             print(f'Could not find background population file: {background_population_file}.\nPlease provide it and try again.\nAborting...')
@@ -998,10 +1008,12 @@ class ComputeFEI:
         background_filename = 'csi0_optical' + piece_of_string + '.out'
         csi_background_folder = os.path.join(cloud_folder_path, 'csi_background')
         os.makedirs(weights_folder_path, exist_ok=True)
+        os.makedirs(csi_background_folder, exist_ok=True)
 
         if not os.path.isfile(background_population_file):
             print(f'Could not find background population file: {background_population_file}.\nPlease provide it and try again.\nAborting...')
             exit()
+
         n, mass, sizes, area, a, e, inc, Omega, omega, M = np.loadtxt(background_population_file, unpack = True, usecols = (0,1,2,3,4,5,6,7,8,9))
 
         sizes = np.sqrt(4*area/np.pi) #area in m^2, sizes in m
@@ -1293,57 +1305,59 @@ class ComputeFEI:
             cumulative_index.close()
 
 
-    def plot_cumulative_indexes(self, output_folder_path, network_type, cloud_names):
+    def plot_cumulative_indexes(self, clouds_folder_path, network_type, cloud_names):
+        output_folder_path = os.path.join(clouds_folder_path, 'output')
+        os.makedirs(output_folder_path, exist_ok=True)
 
+        all_sorted_capabilities = dict()
+        all_csi = dict()
+        h_frag_list = dict()
+        max_csi_list = []
+        csi_cumulative_no_weights_list = []
         for cloud_name in cloud_names:
-            figures_folder = os.path.join(output_folder_path, 'figures')
+            cloud_folder_path = os.path.join(clouds_folder_path, cloud_name)
+            output_folder_path = os.path.join(cloud_folder_path, 'output')
             cumulative_index_folder = os.path.join(output_folder_path, 'cumulative_index')
-            piece_of_strings = []
-            for folder in os.listdir(cumulative_index_folder):
-                if network_type == 'radar':
-                    piece_of_strings.append(folder[5:])
-                else:
-                    piece_of_strings.append(folder[7:])
+            piece_of_strings = [folder[5:] if network_type == 'radar' else folder[7:] for folder in os.listdir(cumulative_index_folder)]
 
             csi_cumulative_list = []
-            csi_cumulative_no_weights_list = []
+
             capability_list = []
+
             for piece_of_string in piece_of_strings:
-
                 s_min = piece_of_string.split('_')[1]
-                print(s_min)
+                capability = float(piece_of_string.split('_')[1][:2]) if len(s_min) == 4 else float(piece_of_string.split('_')[1][:1])
 
-                if len(piece_of_string.split('_')[1]) == 4:
-                    capability = float(piece_of_string.split('_')[1][:2])
-                    print(capability)
-                else:
-                    capability = float(piece_of_string.split('_')[1][:1])
-                    print(capability)
+                csi_cumulative_weights, csi_cumulative_no_weights = np.loadtxt(
+                    cumulative_index_folder + f'/{network_type}{piece_of_string}' + '/cumulative_index',
+                    unpack=True, usecols=2
+                )
 
-                csi_cumulative_weights, csi_cumulative_no_weights = np.loadtxt(cumulative_index_folder + f'/{network_type}{piece_of_string}' + '/cumulative_index', unpack=True, usecols=2)
-
-                print(csi_cumulative_weights)
                 csi_cumulative_list.append(csi_cumulative_weights)
                 csi_cumulative_no_weights_list.append(csi_cumulative_no_weights)
                 capability_list.append(capability)
 
-                print(csi_cumulative_list)
-
-            # Normalize the values
             sorted_capabilities = np.sort(capability_list)
-            normalized_csi = np.sort(csi_cumulative_list)/csi_cumulative_no_weights
+            csi = np.sort(csi_cumulative_list)
+            max_csi_list = np.max(csi_cumulative_no_weights_list)
+            h_frag_list[cloud_name] = cloud_name.split('_')[1]
 
-            print(normalized_csi)
-            print(sorted_capabilities)
+            all_sorted_capabilities[cloud_name] = sorted_capabilities
+            all_csi[cloud_name] = csi
 
-            # Create scatter plot
-            plt.scatter(sorted_capabilities, normalized_csi, alpha=1)
+            print(cloud_name, h_frag_list[cloud_name], all_sorted_capabilities[cloud_name], all_csi[cloud_name])
+            print(max_csi_list)
+            max_csi = np.max(max_csi_list)
+        for cloud_name, sorted_capabilities in all_sorted_capabilities.items():
+            normalized_csi = np.array(all_csi[cloud_name])/max_csi
+            h_frag = h_frag_list[cloud_name]
+            plt.scatter(sorted_capabilities, normalized_csi, alpha=1, label = f'h_frag = {h_frag}')
 
-        # Add plot labels and title
-        plt.title('Cumulative Cloud csi Over 100 Days (Normalized)')
-        plt.xlabel(f'Minimum Detectable Size at {cloud_name.split("_")[1]} km (cm)')
-        plt.ylabel('Cumulative Cloud csi')
+        print(f'Cumulative Index Plot Saved to: {os.path.join(clouds_folder_path, f"Cumulative_csi_Results_{network_type}.png")}')
 
-        # Save the plot
-        plt.savefig(figures_folder + f'/Cumulative_csi_Results')
+        plt.title('Cumulative Cloud CSI Over 100 Days (Normalized)')
+        plt.xlabel('Minimum Detectable Size (cm)')
+        plt.ylabel('Cumulative Cloud CSI')
+        plt.savefig(os.path.join(clouds_folder_path, f'Cumulative_csi_Results_{network_type}.png'))
+        plt.legend()
         plt.show()

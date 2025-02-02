@@ -7,9 +7,10 @@ parent_e = object.SetParent.eccentricity(parent_e = 0.00003)
 parent_inc = object.SetParent.inclination(parent_inc = 80.3)
 
 
-cloud_name = 'nube_450_km'
+cloud_name = 'nube_800_km'
 h_frag = float(cloud_name.split('_')[1])
 h_frag = object.SetFragmentation.fragmentation_altitude(h_frag = h_frag)
+
 s_min = object.SetObservingNetwork.s_min(s_min = 25)
 elevation = object.SetObservingNetwork.constant_elevation(elevation = 30)
 background_population_file = 'background_pop.dat.5cm'
@@ -38,7 +39,13 @@ figures_folder = os.path.join(output_folder_path, 'figures')
 global_csi_folder = os.path.join(output_folder_path, 'global_csi')
 csi_cloud_only_folder = os.path.join(output_folder_path, 'cloud_only_csi')
 
-object.multi_plotter_csi(pieces_of_strings, cloud_name, network_type, figures_folder, global_csi_folder, csi_cloud_only_folder)
+
+#object.multi_plotter_csi(pieces_of_strings, cloud_name, network_type, figures_folder, global_csi_folder, csi_cloud_only_folder)
+#object.get_cumulative_index_files(output_folder_path, network_type, piece_of_string)
+#exit()
+cloud_names = ['nube_1200_km', 'nube_1800_km']
+network_type = 'optical'
+object.plot_cumulative_indexes(clouds_folder_path, network_type, cloud_names)
 exit()
 if network_type == 'radar':
 
