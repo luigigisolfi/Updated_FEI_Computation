@@ -39,7 +39,7 @@ class ComputeFEI:
 
     # Assumes folder structure:
     # clouds/cloud_XXXkm/cloud_XXX.fla
-    def __init__(self, h_frag = None, s_min = None, h_max =None ,elevation = None, r_e = 6378, mean_density_file_path = f'dens_mean_2023.dat', clouds_folder_path = 'clouds', background_population_file = 'background_pop.dat.5cm'):
+    def __init__(self, h_frag = None, s_min = None, h_max =None ,pointing_angle = None, r_e = 6378, mean_density_file_path = f'dens_mean_2023.dat', clouds_folder_path = 'clouds', background_population_file = 'background_pop.dat.5cm'):
         """
         Initialize the ComputeFEI class.
 
@@ -52,7 +52,7 @@ class ComputeFEI:
         self.SetParent = self.SetParent(self)
 
         self.r_e = r_e
-        self.pointing_angle = elevation
+        self.pointing_angle = pointing_angle
         self.s_min = s_min
         self.h_max = h_max
         self.h_frag = h_frag
@@ -106,9 +106,9 @@ class ComputeFEI:
         def __init__(self, outer_instance):
             self.outer_instance = outer_instance
 
-        def constant_elevation(self, elevation):
-            self.pointing_angle = elevation
-            self.outer_instance.elevation = self.pointing_angle
+        def constant_pointing_angle(self, pointing_angle):
+            self.pointing_angle = pointing_angle
+            self.outer_instance.pointing_angle = self.pointing_angle
             return(self.pointing_angle)
 
         def h_max(self, h_max):
@@ -215,7 +215,7 @@ class ComputeFEI:
 
     def w_e_rso(self, s_fragment, a_fragment, i_fragment):
         h_fragment = a_fragment - self.r_e
-        elevation = i_fragment - self.pointing_angle  # given that inc_frag \sim 80 degrees and all telescopes points at 50 degrees, this effectively means to assume all telescopes have phi_telescope = 20 in the max elevation equation: 30 = el_max = 90 - (i_frag - phi_telescope) [modelling can be improved in future simulations]
+        elevation = i_fragment - self.pointing_angle  #given that inc_frag \sim 80 degrees and all telescopes points at 50 degrees, this effectively means to assume all telescopes have phi_telescope = 20 in the max elevation equation: 30 = el_max = 90 - (i_frag - phi_telescope) [modelling can be improved in future simulations]
         rho_fragment = self.h_to_rho(h_fragment, elevation)
         rho_max = self.h_to_rho(self.h_max, elevation)
         if self.m_obj(s_fragment,rho_fragment) <= self.m_obj(self.s_min,rho_max): #check visibility
@@ -485,9 +485,9 @@ class ComputeFEI:
     # In[21]:
 
 
-    def radar(self, parent_mass, parent_e, parent_inc, cloud_name, h_frag, elevation, s_min, h_max, piece_of_string):
+    def radar(self, parent_mass, parent_e, parent_inc, cloud_name, h_frag, pointing_angle, s_min, h_max, piece_of_string):
         r_e = self.r_e
-        elevation = self.SetObservingNetwork.constant_elevation(elevation)
+        pointing_angle = self.SetObservingNetwork.constant_pointing_angle(pointing_angle)
         clouds_folder_path = self.clouds_folder_path
 
         radar_threshold_value = self.radar_threshold(h_frag,s_min,h_max) #minimum detectable size for a given rho_frag
@@ -715,10 +715,10 @@ class ComputeFEI:
     # In[23]:
 
 
-    def optical(self, parent_mass, parent_e, parent_inc, cloud_name, h_frag, elevation, s_min, h_max, piece_of_string):
+    def optical(self, parent_mass, parent_e, parent_inc, cloud_name, h_frag, pointing_angle, s_min, h_max, piece_of_string):
 
         r_e = self.r_e
-        elevation = self.SetObservingNetwork.constant_elevation(elevation)
+        pointing_angle = self.SetObservingNetwork.constant_pointing_angle(pointing_angle)
         clouds_folder_path = self.clouds_folder_path
 
         optical_threshold_value = self.optical_threshold(h_frag,s_min,h_max) #minimum detectable size for a given rho_frag

@@ -1,17 +1,17 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# # FRAGMENTATION INDEX COMPUTATION 
-# 
+# # FRAGMENTATION INDEX COMPUTATION
+#
 # ## Objectives
-# This code shows how to use functions in the `fei_library.py` file in order to compute the (Upgraded) Fragmentation Environmental Index, as devised in [L. Gisolfi Master's Thesis](https://thesis.unipd.it/retrieve/b00fb71a-4118-444b-bb0e-3ab77846ce05/Gisolfi_Luigi.pdf.pdf). 
-# 
+# This code shows how to use functions in the `fei_library.py` file in order to compute the (Upgraded) Fragmentation Environmental Index, as devised in [L. Gisolfi Master's Thesis](https://thesis.unipd.it/retrieve/b00fb71a-4118-444b-bb0e-3ab77846ce05/Gisolfi_Luigi.pdf.pdf).
+#
 # **Author**: Luigi Gisolfi
-# 
+#
 # **Year**: 2025
-# 
-# 
-# Please, create the folder nube_XXX_km with the all the files nube_XXX_km/data/cloud_XXX.fla 
+#
+#
+# Please, create the folder nube_XXX_km with the all the files nube_XXX_km/data/cloud_XXX.fla
 # Make sure you have access to the file dens_mean_no_weights_2023.dat
 # Note: For the background, only MASTER population objects > 5 cm is considered (file: background_pop.dat.5cm) has to be used as input
 
@@ -27,9 +27,9 @@ object = ComputeFEI()
 
 
 # ## Set Parent Objects Properties
-# 
+#
 # The `SetParent` class allows users to store the Parent's eccentricity and inclination (in degrees), as well as its mass (in kg).
-# Of course, these must match the properties of the object that underwent fragmentation. 
+# Of course, these must match the properties of the object that underwent fragmentation.
 
 # In[2]:
 
@@ -40,7 +40,7 @@ parent_inc = object.SetParent.inclination(parent_inc = 80.3)
 
 
 # ## Retrieve h_frag
-# 
+#
 # Each cloud folder is named after the given fragmentation altitude (nube_XXX_km, where XXX indicates the fragmentation altitude. Also, "nube" is the word for "cloud" in italian!), so we use this fact to retrieve the correspoding fragmentation altitude, $h_{frag}$.
 
 # In[3]:
@@ -52,20 +52,20 @@ h_frag = object.SetFragmentation.fragmentation_altitude(h_frag = h_frag)
 
 
 # ## Observing Network Settings
-# 
-# The `SetObservingNetwork` class allows to set the minimum observable size $s_{min}$ at a given reference altitude $h_{max}$. 
-# Setting the network elevation is also possible and achieved via the `SetObservingNetwork.constant_elevation` metho (the elevation could in prinicple be time dependent, but no time dependent elevation method has been developed yet...)
+#
+# The `SetObservingNetwork` class allows to set the minimum observable size $s_{min}$ at a given reference altitude $h_{max}$.
+# Setting the network pointing angle is also possible and achieved via the `SetObservingNetwork.constant_pointing_angle` method (the pointing_angle could in prinicple be time dependent, but no time dependent pointing_angle method has been developed yet...)
 
 # In[4]:
 
 
 s_min = object.SetObservingNetwork.s_min(s_min = 5)
-elevation = object.SetObservingNetwork.constant_elevation(elevation = 30)
+pointing_angle = object.SetObservingNetwork.constant_pointing_angle(pointing_angle = 50)
 
 
 # ## Background Population File
-# 
-# At this point, the background population file path has to be specified. 
+#
+# At this point, the background population file path has to be specified.
 
 # In[5]:
 
@@ -75,7 +75,7 @@ clouds_folder_path = 'clouds'
 
 
 # ## Network Type Automatic Selection
-# 
+#
 # As explained in [L. Gisolfi Master's Thesis](https://thesis.unipd.it/retrieve/b00fb71a-4118-444b-bb0e-3ab77846ce05/Gisolfi_Luigi.pdf.pdf), we assume radar can probe LEO from the lowest shells up to (excluded) $h_{max} = 1200$ km, while optical networks are active between $h = 1200$ km and $h_{max} = 2000$ km.
 
 # In[6]:
@@ -88,12 +88,12 @@ else:
 
 
 # ## Computing Relevant Quantities for Subsequent Analysis
-# We are now ready to compute the global csi, the cloud csi and other quantities. These will allow us to compute the FEI. 
+# We are now ready to compute the global csi, the cloud csi and other quantities. These will allow us to compute the FEI.
 # We:
 # - compute the weighted and unweighted CSI contributions to the background population (as it was before the fragmentation epioch, given the background population file defined above)
 # - compute the weighted and unweighted CSI contributions of all objects after the fragmentation.
-# 
-# Relevant values are saved to files in the `nube_XXX_km/output` folders. 
+#
+# Relevant values are saved to files in the `nube_XXX_km/output` folders.
 
 # In[7]:
 
@@ -117,33 +117,33 @@ csi_cloud_only_folder = os.path.join(output_folder_path, 'cloud_only_csi')
 if network_type == 'radar':
 
     object.radar_background(cloud_name,
-                            h_frag, 
-                            piece_of_string, 
+                            h_frag,
+                            piece_of_string,
                             background_population_file
-                           )
-    
-    day_list, global_csi_cloud_only_list, global_csi_cloud_only_list_no_weights, global_csi_list,global_csi_list_no_weights, ratios_list = object.radar(parent_mass, 
-                                                                                                                                                        parent_e, 
-                                                                                                                                                        parent_inc, 
-                                                                                                                                                        cloud_name, 
-                                                                                                                                                        h_frag, 
-                                                                                                                                                        elevation, 
-                                                                                                                                                        s_min, 
-                                                                                                                                                        h_max, 
+                            )
+
+    day_list, global_csi_cloud_only_list, global_csi_cloud_only_list_no_weights, global_csi_list,global_csi_list_no_weights, ratios_list = object.radar(parent_mass,
+                                                                                                                                                        parent_e,
+                                                                                                                                                        parent_inc,
+                                                                                                                                                        cloud_name,
+                                                                                                                                                        h_frag,
+                                                                                                                                                        pointing_angle,
+                                                                                                                                                        s_min,
+                                                                                                                                                        h_max,
                                                                                                                                                         piece_of_string)
 else:
     object.optical_background(cloud_name, h_frag, piece_of_string, background_population_file)
-    day_list, global_csi_cloud_only_list, global_csi_cloud_only_list_no_weights, global_csi_list,global_csi_list_no_weights, ratios_list = object.optical(parent_mass, 
-                                                                                                                                                          parent_e, 
-                                                                                                                                                          parent_inc, 
-                                                                                                                                                          cloud_name, 
-                                                                                                                                                          h_frag, 
-                                                                                                                                                          elevation, 
-                                                                                                                                                          s_min, 
-                                                                                                                                                          h_max, 
+    day_list, global_csi_cloud_only_list, global_csi_cloud_only_list_no_weights, global_csi_list,global_csi_list_no_weights, ratios_list = object.optical(parent_mass,
+                                                                                                                                                          parent_e,
+                                                                                                                                                          parent_inc,
+                                                                                                                                                          cloud_name,
+                                                                                                                                                          h_frag,
+                                                                                                                                                          pointing_angle,
+                                                                                                                                                          s_min,
+                                                                                                                                                          h_max,
                                                                                                                                                           piece_of_string)
 
-print('Done processing.')   
+print('Done processing.')
 
 
 # ## Plotting the Results
@@ -156,7 +156,7 @@ object.multi_plotter_csi(pieces_of_strings, cloud_name, network_type, figures_fo
 object.get_cumulative_index_files(output_folder_path, network_type, piece_of_string)
 
 
-# ## Cumulative Index: How To Plot It 
+# ## Cumulative Index: How To Plot It
 # After running the above cells for all fragmentations altitudes (i.e. 450 km, 800 km, 1200 km, 1800 km) and for different networks (for instance, setting $s_{min} = 5,10,15,20,25$ cm) the user would be able to get the cumulative index plots via the following (commented for now) lines:
 
 # In[ ]:
