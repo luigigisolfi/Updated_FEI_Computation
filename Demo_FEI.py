@@ -46,7 +46,7 @@ parent_inc = object.SetParent.inclination(parent_inc = 80.3)
 # In[3]:
 
 
-cloud_name = 'nube_450_km'
+cloud_name = 'nube_1200_km'
 h_frag = float(cloud_name.split('_')[1])
 h_frag = object.SetFragmentation.fragmentation_altitude(h_frag = h_frag)
 
@@ -59,7 +59,7 @@ h_frag = object.SetFragmentation.fragmentation_altitude(h_frag = h_frag)
 # In[4]:
 
 
-s_min = object.SetObservingNetwork.s_min(s_min = 25)
+s_min = object.SetObservingNetwork.s_min(s_min = 5)
 elevation = object.SetObservingNetwork.constant_elevation(elevation = 30)
 
 
@@ -150,8 +150,6 @@ print('Done processing.')
 # Finally, the CSI and FEI values are plotted (using the `plotter_csi()`, `plotter_FEI()` and `multi_potter_csi()` methods), and the **cumulative index** file corresponding to the given fragmentation and network is created via `get_cumulative_index_files()`.
 
 # In[8]:
-
-
 object.plotter_csi(network_type, color_plot, day_list, global_csi_cloud_only_list, global_csi_cloud_only_list_no_weights, global_csi_list, s_min, clouds_folder_path, cloud_name, piece_of_string)
 object.plotter_FEI(network_type,color_plot, clouds_folder_path, cloud_name, piece_of_string, h_frag)
 object.multi_plotter_csi(pieces_of_strings, cloud_name, network_type, figures_folder, global_csi_folder, csi_cloud_only_folder)
