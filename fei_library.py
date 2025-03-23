@@ -52,7 +52,7 @@ class ComputeFEI:
         self.SetParent = self.SetParent(self)
 
         self.r_e = r_e
-        self.elevation = elevation
+        self.pointing_angle = elevation
         self.s_min = s_min
         self.h_max = h_max
         self.h_frag = h_frag
@@ -107,9 +107,9 @@ class ComputeFEI:
             self.outer_instance = outer_instance
 
         def constant_elevation(self, elevation):
-            self.elevation = elevation
-            self.outer_instance.elevation = self.elevation
-            return(self.elevation)
+            self.pointing_angle = elevation
+            self.outer_instance.elevation = self.pointing_angle
+            return(self.pointing_angle)
 
         def h_max(self, h_max):
             self.h_max = h_max
@@ -122,7 +122,7 @@ class ComputeFEI:
             return(self.s_min)
 
 
-    def rho_to_h(self, rho, relative_elevation):
+    def rho_to_h(self, rho, elevation):
 
         """
         Compute the height (h) of the target given its range (rho).
@@ -135,13 +135,13 @@ class ComputeFEI:
 
         """
         r_e = self.r_e
-        r = np.sqrt(r_e**2 + rho**2 - 2 * r_e * rho * np.cos(np.pi / 2 + relative_elevation))
+        r = np.sqrt(r_e**2 + rho**2 - 2 * r_e * rho * np.cos(np.pi / 2 + elevation))
         self.h = r - r_e
         return(self.h)
 
-    def h_to_rho(self, h, relative_elevation):
+    def h_to_rho(self, h, elevation):
         r_e = self.r_e
-        self.rho = r_e*(np.sqrt(((h+r_e)/r_e)**2 - np.cos(relative_elevation)**2) - np.sin(relative_elevation))
+        self.rho = r_e*(np.sqrt(((h+r_e)/r_e)**2 - np.cos(elevation)**2) - np.sin(elevation))
         return(self.rho)
 
 
@@ -174,8 +174,8 @@ class ComputeFEI:
 
 
     def optical_threshold(self, h_frag,s_min,h_max):
-        rho_frag = self.h_to_rho(h_frag, relative_elevation=0)
-        rho_max = self.h_to_rho(h_max, relative_elevation=0)
+        rho_frag = self.h_to_rho(h_frag, elevation=0)
+        rho_max = self.h_to_rho(h_max, elevation=0)
 
 
         self.optical_threshold_value = 0
@@ -189,10 +189,10 @@ class ComputeFEI:
     def radar_threshold(self, h_frag,s_min,h_max):
         self.radar_threshold_value = 0.01
         ratio = 0.00001
-        rho_frag = self.h_to_rho(h_frag, relative_elevation=0)
+        rho_frag = self.h_to_rho(h_frag, elevation=0)
 
         sigma_min = (np.pi/4)*s_min**2
-        rho_max = self.h_to_rho(h_max, relative_elevation=0)
+        rho_max = self.h_to_rho(h_max, elevation=0)
 
         while ratio <= 1:
             self.radar_threshold_value += 0.01
@@ -215,9 +215,9 @@ class ComputeFEI:
 
     def w_e_rso(self, s_fragment, a_fragment, i_fragment):
         h_fragment = a_fragment - self.r_e
-        relative_elevation = i_fragment - self.elevation
-        rho_fragment = self.h_to_rho(h_fragment, relative_elevation)
-        rho_max = self.h_to_rho(self.h_max, relative_elevation)
+        elevation = i_fragment - self.pointing_angle  # given that inc_frag \sim 80 degrees and all telescopes points at 50 degrees, this effectively means to assume all telescopes have phi_telescope = 20 in the max elevation equation: 30 = el_max = 90 - (i_frag - phi_telescope) [modelling can be improved in future simulations]
+        rho_fragment = self.h_to_rho(h_fragment, elevation)
+        rho_max = self.h_to_rho(self.h_max, elevation)
         if self.m_obj(s_fragment,rho_fragment) <= self.m_obj(self.s_min,rho_max): #check visibility
 
             if s_fragment <= self.s_min:
@@ -274,11 +274,11 @@ class ComputeFEI:
 
         h_fragment = a_fragment - self.r_e
         sigma_fragment = (np.pi/4)*s_fragment**2
-        relative_elevation = i_fragment - self.elevation
-        rho_fragment_radar = self.h_to_rho(h_fragment, relative_elevation)
+        elevation = i_fragment - self.pointing_angle  # given that inc_frag \sim 80 degrees and all telescopes points at 50 degrees, this effectively means to assume all telescopes have phi_telescope = 20 in the max elevation equation: 30 = el_max = 90 - (i_frag - phi_telescope) [modelling can be improved in future simulations]
+        rho_fragment_radar = self.h_to_rho(h_fragment, elevation)
 
         sigma_min_radar = (np.pi/4)*self.s_min**2
-        rho_max_radar = self.h_to_rho(self.h_max, relative_elevation)
+        rho_max_radar = self.h_to_rho(self.h_max, elevation)
 
         if (sigma_fragment/rho_fragment_radar**4) >= (sigma_min_radar/rho_max_radar**4):
 
