@@ -122,7 +122,7 @@ class ComputeFEI:
             return(self.s_min)
 
 
-    def rho_to_h(self, rho):
+    def rho_to_h(self, rho, relative_elevation):
 
         """
         Compute the height (h) of the target given its range (rho).
@@ -135,15 +135,13 @@ class ComputeFEI:
 
         """
         r_e = self.r_e
-        elevation = self.elevation
-        r = np.sqrt(r_e**2 + rho**2 - 2 * r_e * rho * np.cos(np.pi / 2 + elevation))
+        r = np.sqrt(r_e**2 + rho**2 - 2 * r_e * rho * np.cos(np.pi / 2 + relative_elevation))
         self.h = r - r_e
         return(self.h)
 
-    def h_to_rho(self, h):
+    def h_to_rho(self, h, relative_elevation):
         r_e = self.r_e
-        elevation = self.elevation
-        self.rho = r_e*(np.sqrt(((h+r_e)/r_e)**2 - np.cos(elevation)**2) - np.sin(elevation))
+        self.rho = r_e*(np.sqrt(((h+r_e)/r_e)**2 - np.cos(relative_elevation)**2) - np.sin(relative_elevation))
         return(self.rho)
 
 
@@ -176,8 +174,8 @@ class ComputeFEI:
 
 
     def optical_threshold(self, h_frag,s_min,h_max):
-        rho_frag = self.h_to_rho(h_frag)
-        rho_max = self.h_to_rho(h_max)
+        rho_frag = self.h_to_rho(h_frag, relative_elevation=0)
+        rho_max = self.h_to_rho(h_max, relative_elevation=0)
 
 
         self.optical_threshold_value = 0
@@ -191,10 +189,10 @@ class ComputeFEI:
     def radar_threshold(self, h_frag,s_min,h_max):
         self.radar_threshold_value = 0.01
         ratio = 0.00001
-        rho_frag = self.h_to_rho(h_frag)
+        rho_frag = self.h_to_rho(h_frag, relative_elevation=0)
 
         sigma_min = (np.pi/4)*s_min**2
-        rho_max = self.h_to_rho(h_max)
+        rho_max = self.h_to_rho(h_max, relative_elevation=0)
 
         while ratio <= 1:
             self.radar_threshold_value += 0.01
@@ -215,10 +213,11 @@ class ComputeFEI:
     # In[11]:
 
 
-    def w_e_rso(self, s_fragment, a_fragment):
+    def w_e_rso(self, s_fragment, a_fragment, i_fragment):
         h_fragment = a_fragment - self.r_e
-        rho_fragment = self.h_to_rho(h_fragment)
-        rho_max = self.h_to_rho(self.h_max)
+        relative_elevation = i_fragment - self.elevation
+        rho_fragment = self.h_to_rho(h_fragment, relative_elevation)
+        rho_max = self.h_to_rho(self.h_max, relative_elevation)
         if self.m_obj(s_fragment,rho_fragment) <= self.m_obj(self.s_min,rho_max): #check visibility
 
             if s_fragment <= self.s_min:
@@ -271,14 +270,15 @@ class ComputeFEI:
     # In[18]:
 
 
-    def w_radar(self, s_fragment,a_fragment):
+    def w_radar(self, s_fragment,a_fragment, i_fragment):
 
         h_fragment = a_fragment - self.r_e
         sigma_fragment = (np.pi/4)*s_fragment**2
-        rho_fragment_radar = self.h_to_rho(h_fragment)
+        relative_elevation = i_fragment - self.elevation
+        rho_fragment_radar = self.h_to_rho(h_fragment, relative_elevation)
 
         sigma_min_radar = (np.pi/4)*self.s_min**2
-        rho_max_radar = self.h_to_rho(self.h_max)
+        rho_max_radar = self.h_to_rho(self.h_max, relative_elevation)
 
         if (sigma_fragment/rho_fragment_radar**4) >= (sigma_min_radar/rho_max_radar**4):
 
@@ -567,7 +567,7 @@ class ComputeFEI:
             inc = inc[combined]
             mass = mass[combined]
 
-            weights = list(map(self.w_radar, sizes,a))
+            weights = list(map(self.w_radar, sizes,a, inc))
 
             csi_shell_list = []
             csi_shell_list_no_weights = []
@@ -799,7 +799,7 @@ class ComputeFEI:
             inc = inc[combined]
             mass = mass[combined]
 
-            omega_i_map = list(map(self.w_e_rso, sizes,a))
+            omega_i_map = list(map(self.w_e_rso, sizes,a, inc))
             omega_i_map = np.array(omega_i_map)
 
             omega_j_map = np.full(shape= len(omega_i_map), fill_value=omega_j_elem,dtype=float)
@@ -961,8 +961,9 @@ class ComputeFEI:
         combined = combined & e_cond
         a = a[combined]
         sizes = sizes[combined]
+        inc = inc[combined]
 
-        weights = list(map(self.w_radar, sizes,a))
+        weights = list(map(self.w_radar, sizes,a, inc))
 
         np.set_printoptions(threshold=np.inf)
 
@@ -973,7 +974,6 @@ class ComputeFEI:
                 fw.writelines(str(line)[1:-1] + '\n')
 
         e = e[combined]
-        inc = inc[combined]
         mass = mass[combined]
 
         no_weights = np.ones(len(weights))
@@ -1026,9 +1026,10 @@ class ComputeFEI:
         combined = combined & e_cond
         a = a[combined]
         sizes = sizes[combined]
+        inc = inc[combined]
 
         omega_i_list =[] #initialize w_e_rso list
-        omega_i_map = list(map(self.w_e_rso, sizes,a))
+        omega_i_map = list(map(self.w_e_rso, sizes,a, inc))
         omega_i_map = np.array(omega_i_map)
 
         omega_j_map = np.full(shape= len(omega_i_map), fill_value=omega_j_elem,dtype=float)
@@ -1044,7 +1045,6 @@ class ComputeFEI:
                 fw.writelines(str(line)[1:-1] + '\n')
 
         e = e[combined]
-        inc = inc[combined]
         mass = mass[combined]
 
         no_weights = np.ones(len(weights))
