@@ -1,6 +1,6 @@
 # Welcome!
 
-This repository contains both the source code and a demo to show how to compute the **Fragmentation Environmental Index**, as devised in: [L. Gisolfi Master's Thesis](https://thesis.unipd.it/retrieve/b00fb71a-4118-444b-bb0e-3ab77846ce05/Gisolfi_Luigi.pdf.pdf). 
+This repository contains both the source code and a demo to show how to compute the **Fragmentation Environmental Index**, as devised in: [L. Gisolfi Master's Thesis](https://thesis.unipd.it/retrieve/b00fb71a-4118-444b-bb0e-3ab77846ce05/Gisolfi_Luigi.pdf.pdf) or in this [conference paper](https://www.researchgate.net/publication/388590171_Fast_Characterization_of_In-Orbit_Fragmentations). 
 
 You're welcome to use it for your own analysis, suggest improvements and/or blame the author for his silly mistakes.
 
